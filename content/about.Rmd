@@ -1,0 +1,33 @@
+---
+author: 
+title: About me
+---
+
+<img src="https://avatars0.githubusercontent.com/u/37358653?s=400&v=4" style="max-width:25%;min-width:40px;float:right;" alt="Churches avatar" />
+
+## TL;DR
+* Public sector statistician
+* Former neuroscienctist
+
+## Long version
+### The past
+I completed my PhD at the [Univeristy of Cambridge](https://www.autismresearchcentre.com/people_Churches) in 2011 and untill 2017, I was a neuroscientist. There is a good list of my academic publications [here](https://scholar.google.com/citations?user=nTXN-X8AAAAJ&hl=en). I quite enjoyed a lot about being an academic. I did some lectures where I lead the class in protest against the tyrany of frequentist statistics^[With appreciation and appologies to Bob Dylan]:
+
+```{r echo = FALSE}
+blogdown::shortcode("youtube", "2ze-_jA1X94")
+```
+
+And I was sometimes joined for lectures by a virtual teaching assistant.
+
+```{r echo = FALSE}
+blogdown::shortcode("youtube", "jDtSo6nijfI")
+```
+
+### The present
+I am a statistician working for the Government of South Australia. I started this job in 2017. I provide analyses of administrative data for internal government communications and public facing data visualisations.
+
+I also provide advice to government on the use of quantitative information including the construction of automated decision making systems. My work in this field led me to a [Churchill Fellowship](https://www.churchilltrust.com.au/fellows/detail/4329/Owen+Churches) in 2019 to look at ethical and just regulation of artificial intelligences.
+
+
+
+

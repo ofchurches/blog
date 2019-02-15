@@ -1,0 +1,160 @@
+---
+title: South Australian Legislative Network
+#author: Owen Churches
+date: '2018-11-01'
+slug: Legislative network
+categories:
+  - Legislation
+tags:
+  - legislation
+  - networks
+---
+#Background
+I joined the public service in 2017. Pretty soon after I started my boss and new colleagues suggested that the most important thing for me to read would be the legislation that I work under^[Which happens to be the [Children and Young People (Oversight and Advocacy Bodies) Act 2016](https://www.legislation.sa.gov.au/LZ/C/A/CHILDREN%20AND%20YOUNG%20PEOPLE%20(OVERSIGHT%20AND%20ADVOCACY%20BODIES)%20ACT%202016.aspx)]. 
+
+The thing is, when reading *my* legislation, I realised that it referenced several other pieces of legislation. This meant that to fully understand *my* legislation I also had to read these referenced pieces of legislation. But guess what? All these pieces of legislation also referenced other pieces of legislation. I realised that this could go on for quite some time!
+
+Also, I realised that this situation really suits a graph solution. In this sense:
+
+* acts are nodes
+* mentions of acts are links
+
+My plan was:
+
+1. Download all the legislation active in South Australia at the moment
+2. Make a list of all the legislation
+3. Look for mentions of other acts within each act and make an edge list
+4. Make the graph
+5. Explore the network metrics
+6. Make an interactive plot of the whole thing because pictures of graphs are pretty and informative
+
+#So, to work...
+##Downloading the legislation
+This was easier than I thought. South Australia is super progressive with its use of open data and there is a copy of all legislation [currently in use](https://data.sa.gov.au/data/dataset/legislative-database). Impressively, this is updated every two weeks^[And the previous updates are stored giving a snapshot of legislation active every two week. This raises the possibility of looking at the way legislation has evolved.]
+
+##A list of legislation
+The current legislation is in a folder called "A" (for "Acts"). 
+
+```{r eval=FALSE}
+library(here)
+library(striprtf)
+library(tidyverse)
+library(tidygraph)
+library(igraph)
+library(ggraph)
+
+acts <- list.files(path = here("A"), 
+                        pattern = "rtf$", 
+                        recursive = TRUE) %>%
+  tibble() %>%
+  rename("directory" = ".") %>%
+  mutate(from = str_extract(directory, ".+?(?=/)"))
+```
+
+## Look for mentions
+For some inexplicable reason the content of the acts is stored in rich text format. But `striprtf::read_rtf` works pretty well.
+```{r eval=FALSE}
+content <- ""
+for (n in 1:nrow(acts)) {
+  content[n] <- read_rtf(here("A", acts$directory[n])) %>%
+    paste(collapse = " ")
+}
+
+content <- tibble(content)
+
+acts <- bind_cols(acts, content)
+```
+
+## Make the graph
+
+I tried and failed with a few differed regex approaches. Eventually I settled on this:
+
+```{r eval=FALSE}
+acts <- mutate(content = str_replace_all(content, "\\s+", " ")) %>% 
+  mutate(to = str_extract_all(content, paste(as.character(from), collapse="|"))) %>%
+  unnest(to) %>%
+  select(from, to)
+
+acts_graph <- as_tbl_graph(acts, directed = FALSE) %>% 
+    mutate(community = as.factor(group_walktrap())) %>%
+  mutate(centrality = centrality_degree())
+
+ggraph(acts_graph, layout = 'graphopt', charge = .05) + 
+    geom_edge_link(alpha = .8) + 
+    geom_node_point(aes(colour = community, size = centrality), alpha = .3) + 
+  guides(colour = FALSE) + 
+    theme_graph() + 
+  labs(title = str_wrap("Hairball of active legislation in South Australia November 2018", 50), caption = "Colour is the result of community detection and like the rest of the plot fulfils no explanatory purpose")
+```
+
+<img src = "/legislation_hairball.png" alt="" />
+
+Ok, I should move on and never talk of that again.
+
+## Explore the metrics
+A decent place to start would be a histogram of the centrality of each act in the network.
+
+```{r eval=FALSE}
+acts_metrics <- acts_graph %>%
+  activate(nodes) %>%
+  as.tibble()
+
+ggplot(data = acts_metrics, aes(x = centrality)) + 
+  geom_histogram(binwidth = 2) + 
+  labs(title = str_wrap("Histogram of centrality of acts in the network of legislation in South Australia, November 2018", 70))
+```
+
+<img src = "/legislation_histogram.png" alt="" />
+
+So, there are way more acts with few connections than there are acts with many connection. Its not quite on the scale of a powerlaw though.
+
+Something that would be interesting to check would be the relationship between the centrality of the acts and the year the act was assented to by the Governor.
+
+```{r eval=FALSE}
+acts_metrics <- acts_metrics %>%
+  mutate(year = str_sub(name, -4, -1)) %>%
+  mutate(year = as.numeric(year))
+
+ggplot(data = acts_metrics, aes(x = year, y = centrality)) + 
+  geom_point() +
+  geom_label_repel(data = subset(acts_metrics, centrality > 30), 
+                  aes(label = name, fill = community))
+```
+<img src = "/legislation_scatter.png" alt="" />
+
+So the more recent acts are also the more interlinked acts. And from the change in density on the x axis, it seems that there are way more recent acts in the network. Also, yes, I snuck the community detection back in there for the highly connected acts and it seems that one of the communities deals with finance and the other with natural resources.
+
+One other thing really stuck out is the line of acts that seem to be preserved in the current legislation that were all ascented to in 1936.
+```{r eval = FALSE}
+what_a_year <- acts_metrics %>%
+  filter(year == 1936) %>% 
+  select(name)
+
+kable(what_a_year)
+```
+**name**  
+Civil Liability Act 1936  
+Debtors Act 1936  
+Explosives Act 1936  
+Land Tax Act 1936  
+Landlord and Tennant Act 1936  
+Law of Property Act 1936  
+Limitation of Actions Act 1936  
+Lottery and Gamy Act 1936  
+Mercantile Act 1936  
+Oaths Act 1936  
+Redundant Officers Fund Act 1936  
+Trustee Act 1936  
+Wills Act 1936  
+
+What happened in 1936 or what is it about these acts that has meant they have endured?
+
+## Make an interactive plot
+
+So, the last thing I wanted to do was make an interactive, zoomable, clickable network of the legislation. Serendipitously, I had just been introduced to the wonderful `networkD3` package via Twitter from some amazing network researchers at Adelaide University:
+
+```{r echo = FALSE}
+blogdown::shortcode("tweet", "1060706080374763520")
+```
+
+So [here](https://ofchurches.shinyapps.io/leg_app) it is. Its worth clicking through to open the `shinyapp` in its own window because its a big network. You can select the name of a piece of legislation to see its place in the network.

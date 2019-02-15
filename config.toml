@@ -1,0 +1,29 @@
+baseurl = "/"
+languageCode = "en-us"
+title = "Owen Churches's blog"
+theme = "hugo-xmin"
+googleAnalytics = ""
+disqusShortname = ""
+ignoreFiles = ["\\.Rmd$", "\\.Rmarkdown$", "_files$", "_cache$"]
+preserveTaxonomyNames = true
+footnotereturnlinkcontents = "↩"
+
+[permalinks]
+    post = "/post/:year/:month/:day/:slug/"
+
+[[menu.main]]
+    name = "Home"
+    url = "/"
+    weight = 1
+[[menu.main]]
+    name = "About"
+    url = "/about/"
+    weight = 2
+[[menu.main]]
+    name = "Tags"
+    url = "/tags/"
+    weight = 4
+
+[params]
+    description = "A website built through Hugo and blogdown."
+    footer = "&copy; Owen Churches 2018-2019 | [Github](https://github.com/ofchurches) | [Twitter](https://twitter.com/owenchurches)"

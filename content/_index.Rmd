@@ -1,0 +1,8 @@
+---
+title: Home
+---
+
+<img src="/knitted.png" style="max-width:100%;min-width:40px;float:centre;" alt="knitted neurons" />
+
+# Owen Churches's Blog
+
