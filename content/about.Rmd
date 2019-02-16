@@ -11,7 +11,7 @@ title: About me
 
 ## Long version
 ### The past
-I completed my PhD at the [Univeristy of Cambridge](https://www.autismresearchcentre.com/people_Churches) in 2011 and untill 2017, I was a neuroscientist. There is a good list of my academic publications [here](https://scholar.google.com/citations?user=nTXN-X8AAAAJ&hl=en). I quite enjoyed a lot about being an academic. I did some lectures where I lead the class in protest against the tyrany of frequentist statistics^[With appreciation and appologies to Bob Dylan]:
+I completed my PhD at the [Univeristy of Cambridge](https://www.autismresearchcentre.com/people_Churches) in 2011 and until 2017, I was a neuroscientist. There is a good list of my academic publications [here](https://scholar.google.com/citations?user=nTXN-X8AAAAJ&hl=en). I quite enjoyed a lot about being an academic. I did some lectures where I lead the class in protest against the tyrany of frequentist statistics^[With appreciation and appologies to Bob Dylan]:
 
 ```{r echo = FALSE}
 blogdown::shortcode("youtube", "2ze-_jA1X94")
