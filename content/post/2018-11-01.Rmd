@@ -67,6 +67,11 @@ acts <- bind_cols(acts, content)
 
 ## Make the graph
 
+Full, confession: I aquired some`tidygraph` and `ggraph` hex-stickers at UseR2018 
+
+<img src = "/laptop_stickers.jpg" alt="" />
+
+but haven't really put the packages to good use. So, this was an opportunity.
 I tried and failed with a few differed regex approaches. Eventually I settled on this:
 
 ```{r eval=FALSE}
@@ -106,7 +111,7 @@ ggplot(data = acts_metrics, aes(x = centrality)) +
 
 <img src = "/legislation_histogram.png" alt="" />
 
-So, there are way more acts with few connections than there are acts with many connection. Its not quite on the scale of a powerlaw though.
+So, there are way more acts with few connections than there are acts with many connection. Its not quite on the scale of a power law though.
 
 Something that would be interesting to check would be the relationship between the centrality of the acts and the year the act was assented to by the Governor.
 
@@ -124,7 +129,7 @@ ggplot(data = acts_metrics, aes(x = year, y = centrality)) +
 
 So the more recent acts are also the more interlinked acts. And from the change in density on the x axis, it seems that there are way more recent acts in the network. Also, yes, I snuck the community detection back in there for the highly connected acts and it seems that one of the communities deals with finance and the other with natural resources.
 
-One other thing really stuck out is the line of acts that seem to be preserved in the current legislation that were all ascented to in 1936.
+One other thing really stuck out is the line of acts that seem to be preserved in the current legislation that were all assented to in 1936.
 ```{r eval = FALSE}
 what_a_year <- acts_metrics %>%
   filter(year == 1936) %>% 
@@ -151,7 +156,7 @@ What happened in 1936 or what is it about these acts that has meant they have en
 
 ## Make an interactive plot
 
-So, the last thing I wanted to do was make an interactive, zoomable, clickable network of the legislation. Serendipitously, I had just been introduced to the wonderful `networkD3` package via Twitter from some amazing network researchers at Adelaide University:
+So, the last thing I wanted to do was make an interactive, zoom-able, clickable network of the legislation. Serendipitously, I had just been introduced to the wonderful `networkD3` package via Twitter from some amazing network researchers at Adelaide University:
 
 ```{r echo = FALSE}
 blogdown::shortcode("tweet", "1060706080374763520")

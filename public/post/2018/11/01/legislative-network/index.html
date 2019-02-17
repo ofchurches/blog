@@ -90,7 +90,9 @@ acts &lt;- bind_cols(acts, content)</code></pre>
 </div>
 <div id="make-the-graph" class="section level2">
 <h2>Make the graph</h2>
-<p>I tried and failed with a few differed regex approaches. Eventually I settled on this:</p>
+<p>Full, confession: I aquired some<code>tidygraph</code> and <code>ggraph</code> hex-stickers at UseR2018</p>
+<p><img src = "/laptop_stickers.jpg" alt="" /></p>
+<p>but haven’t really put the packages to good use. So, this was an opportunity. I tried and failed with a few differed regex approaches. Eventually I settled on this:</p>
 <pre class="r"><code>acts &lt;- mutate(content = str_replace_all(content, &quot;\\s+&quot;, &quot; &quot;)) %&gt;% 
   mutate(to = str_extract_all(content, paste(as.character(from), collapse=&quot;|&quot;))) %&gt;%
   unnest(to) %&gt;%
@@ -120,7 +122,7 @@ ggplot(data = acts_metrics, aes(x = centrality)) +
   geom_histogram(binwidth = 2) + 
   labs(title = str_wrap(&quot;Histogram of centrality of acts in the network of legislation in South Australia, November 2018&quot;, 70))</code></pre>
 <p><img src = "/legislation_histogram.png" alt="" /></p>
-<p>So, there are way more acts with few connections than there are acts with many connection. Its not quite on the scale of a powerlaw though.</p>
+<p>So, there are way more acts with few connections than there are acts with many connection. Its not quite on the scale of a power law though.</p>
 <p>Something that would be interesting to check would be the relationship between the centrality of the acts and the year the act was assented to by the Governor.</p>
 <pre class="r"><code>acts_metrics &lt;- acts_metrics %&gt;%
   mutate(year = str_sub(name, -4, -1)) %&gt;%
@@ -132,7 +134,7 @@ ggplot(data = acts_metrics, aes(x = year, y = centrality)) +
                   aes(label = name, fill = community))</code></pre>
 <p><img src = "/legislation_scatter.png" alt="" /></p>
 <p>So the more recent acts are also the more interlinked acts. And from the change in density on the x axis, it seems that there are way more recent acts in the network. Also, yes, I snuck the community detection back in there for the highly connected acts and it seems that one of the communities deals with finance and the other with natural resources.</p>
-<p>One other thing really stuck out is the line of acts that seem to be preserved in the current legislation that were all ascented to in 1936.</p>
+<p>One other thing really stuck out is the line of acts that seem to be preserved in the current legislation that were all assented to in 1936.</p>
 <pre class="r"><code>what_a_year &lt;- acts_metrics %&gt;%
   filter(year == 1936) %&gt;% 
   select(name)
@@ -156,7 +158,7 @@ Wills Act 1936</p>
 </div>
 <div id="make-an-interactive-plot" class="section level2">
 <h2>Make an interactive plot</h2>
-<p>So, the last thing I wanted to do was make an interactive, zoomable, clickable network of the legislation. Serendipitously, I had just been introduced to the wonderful <code>networkD3</code> package via Twitter from some amazing network researchers at Adelaide University:</p>
+<p>So, the last thing I wanted to do was make an interactive, zoom-able, clickable network of the legislation. Serendipitously, I had just been introduced to the wonderful <code>networkD3</code> package via Twitter from some amazing network researchers at Adelaide University:</p>
 <blockquote class="twitter-tweet"><p lang="en" dir="ltr">I used <a href="https://twitter.com/ChrisGandrud?ref_src=twsrc%5Etfw">@ChrisGandrud</a>&#39;s networkD3 package which can convert from an igraph object :) <br>I agree, the animation is very satisfying!</p>&mdash; Michelle Edwards (@maths_michelle) <a href="https://twitter.com/maths_michelle/status/1060706080374763520?ref_src=twsrc%5Etfw">November 9, 2018</a></blockquote>
 <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
 
