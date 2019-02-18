@@ -61,14 +61,53 @@
 <div id="a-list-of-legislation" class="section level2">
 <h2>A list of legislation</h2>
 <p>The current legislation is in a folder called “A” (for “Acts”).</p>
-<pre class="r"><code>library(here)
-library(striprtf)
-library(tidyverse)
-library(tidygraph)
-library(igraph)
-library(ggraph)
+<pre class="r"><code>library(here)</code></pre>
+<pre><code>## here() starts at /Users/hannahkeage/R_projects/blog/blog</code></pre>
+<pre class="r"><code>library(striprtf)
+library(tidyverse)</code></pre>
+<pre><code>## ── Attaching packages ─────────────────────────────────────────────── tidyverse 1.2.1 ──</code></pre>
+<pre><code>## ✔ ggplot2 3.0.0     ✔ purrr   0.2.4
+## ✔ tibble  1.4.2     ✔ dplyr   0.7.6
+## ✔ tidyr   0.8.1     ✔ stringr 1.3.1
+## ✔ readr   1.1.1     ✔ forcats 0.3.0</code></pre>
+<pre><code>## ── Conflicts ────────────────────────────────────────────────── tidyverse_conflicts() ──
+## ✖ dplyr::filter() masks stats::filter()
+## ✖ dplyr::lag()    masks stats::lag()</code></pre>
+<pre class="r"><code>library(tidygraph)</code></pre>
+<pre><code>## 
+## Attaching package: &#39;tidygraph&#39;</code></pre>
+<pre><code>## The following object is masked from &#39;package:stats&#39;:
+## 
+##     filter</code></pre>
+<pre class="r"><code>library(igraph)</code></pre>
+<pre><code>## 
+## Attaching package: &#39;igraph&#39;</code></pre>
+<pre><code>## The following object is masked from &#39;package:tidygraph&#39;:
+## 
+##     groups</code></pre>
+<pre><code>## The following objects are masked from &#39;package:dplyr&#39;:
+## 
+##     as_data_frame, groups, union</code></pre>
+<pre><code>## The following objects are masked from &#39;package:purrr&#39;:
+## 
+##     compose, simplify</code></pre>
+<pre><code>## The following object is masked from &#39;package:tidyr&#39;:
+## 
+##     crossing</code></pre>
+<pre><code>## The following object is masked from &#39;package:tibble&#39;:
+## 
+##     as_data_frame</code></pre>
+<pre><code>## The following objects are masked from &#39;package:stats&#39;:
+## 
+##     decompose, spectrum</code></pre>
+<pre><code>## The following object is masked from &#39;package:base&#39;:
+## 
+##     union</code></pre>
+<pre class="r"><code>library(ggraph)
+library(ggrepel)
+library(knitr)
 
-acts &lt;- list.files(path = here(&quot;A&quot;), 
+acts &lt;- list.files(path = here(&quot;static&quot;, &quot;A&quot;), 
                         pattern = &quot;rtf$&quot;, 
                         recursive = TRUE) %&gt;%
   tibble() %&gt;%
@@ -77,28 +116,30 @@ acts &lt;- list.files(path = here(&quot;A&quot;),
 </div>
 <div id="look-for-mentions" class="section level2">
 <h2>Look for mentions</h2>
-<p>For some inexplicable reason the content of the acts is stored in rich text format. But <code>striprtf::read_rtf</code> works pretty well.</p>
+<p>For some inexplicable reason the content of the acts is stored in rich text format. But <code>striprtf::read_rtf</code> works well.</p>
 <pre class="r"><code>content &lt;- &quot;&quot;
 for (n in 1:nrow(acts)) {
-  content[n] &lt;- read_rtf(here(&quot;A&quot;, acts$directory[n])) %&gt;%
+  content[n] &lt;- read_rtf(here(&quot;static&quot;, &quot;A&quot;, acts$directory[n])) %&gt;%
     paste(collapse = &quot; &quot;)
 }
 
 content &lt;- tibble(content)
 
-acts &lt;- bind_cols(acts, content)</code></pre>
+acts_content &lt;- bind_cols(acts, content)</code></pre>
+<p>Puling the mentioned acts out of the content required a bit of regex.</p>
+<pre class="r"><code>acts_mentions &lt;- acts_content %&gt;%
+  mutate(content = str_replace_all(content, &quot;\\s+&quot;, &quot; &quot;)) %&gt;% 
+  mutate(to = str_extract_all(content, paste(as.character(from), collapse=&quot;|&quot;))) %&gt;%
+  unnest(to) %&gt;%
+  select(from, to)</code></pre>
 </div>
 <div id="make-the-graph" class="section level2">
 <h2>Make the graph</h2>
+<p>I tried and failed with a few differed regex approaches. Eventually I settled on this:</p>
 <p>Full, confession: I aquired some<code>tidygraph</code> and <code>ggraph</code> hex-stickers at UseR2018</p>
 <p><img src = "/laptop_stickers.jpg" alt="" /></p>
-<p>but haven’t really put the packages to good use. So, this was an opportunity. I tried and failed with a few differed regex approaches. Eventually I settled on this:</p>
-<pre class="r"><code>acts &lt;- mutate(content = str_replace_all(content, &quot;\\s+&quot;, &quot; &quot;)) %&gt;% 
-  mutate(to = str_extract_all(content, paste(as.character(from), collapse=&quot;|&quot;))) %&gt;%
-  unnest(to) %&gt;%
-  select(from, to)
-
-acts_graph &lt;- as_tbl_graph(acts, directed = FALSE) %&gt;% 
+<p>but haven’t really put the packages to good use. So, this was an opportunity.</p>
+<pre class="r"><code>acts_graph &lt;- as_tbl_graph(acts_mentions, directed = FALSE) %&gt;% 
     mutate(community = as.factor(group_walktrap())) %&gt;%
   mutate(centrality = centrality_degree())
 
@@ -108,8 +149,7 @@ ggraph(acts_graph, layout = &#39;graphopt&#39;, charge = .05) +
   guides(colour = FALSE) + 
     theme_graph() + 
   labs(title = str_wrap(&quot;Hairball of active legislation in South Australia November 2018&quot;, 50), caption = &quot;Colour is the result of community detection and like the rest of the plot fulfils no explanatory purpose&quot;)</code></pre>
-<p><img src = "/legislation_hairball.png" alt="" /></p>
-<p>Ok, I should move on and never talk of that again.</p>
+<p><img src="/post/2018-11-01_files/figure-html/unnamed-chunk-4-1.png" width="672" /> Ok, I should move on and never talk of that again.</p>
 </div>
 <div id="explore-the-metrics" class="section level2">
 <h2>Explore the metrics</h2>
@@ -121,8 +161,7 @@ ggraph(acts_graph, layout = &#39;graphopt&#39;, charge = .05) +
 ggplot(data = acts_metrics, aes(x = centrality)) + 
   geom_histogram(binwidth = 2) + 
   labs(title = str_wrap(&quot;Histogram of centrality of acts in the network of legislation in South Australia, November 2018&quot;, 70))</code></pre>
-<p><img src = "/legislation_histogram.png" alt="" /></p>
-<p>So, there are way more acts with few connections than there are acts with many connection. Its not quite on the scale of a power law though.</p>
+<p><img src="/post/2018-11-01_files/figure-html/unnamed-chunk-5-1.png" width="672" /> So, there are way more acts with few connections than there are acts with many connection. Its not quite on the scale of a power law though.</p>
 <p>Something that would be interesting to check would be the relationship between the centrality of the acts and the year the act was assented to by the Governor.</p>
 <pre class="r"><code>acts_metrics &lt;- acts_metrics %&gt;%
   mutate(year = str_sub(name, -4, -1)) %&gt;%
@@ -132,28 +171,61 @@ ggplot(data = acts_metrics, aes(x = year, y = centrality)) +
   geom_point() +
   geom_label_repel(data = subset(acts_metrics, centrality &gt; 30), 
                   aes(label = name, fill = community))</code></pre>
-<p><img src = "/legislation_scatter.png" alt="" /></p>
-<p>So the more recent acts are also the more interlinked acts. And from the change in density on the x axis, it seems that there are way more recent acts in the network. Also, yes, I snuck the community detection back in there for the highly connected acts and it seems that one of the communities deals with finance and the other with natural resources.</p>
+<p><img src="/post/2018-11-01_files/figure-html/unnamed-chunk-6-1.png" width="672" /> So the more recent acts are also the more interlinked acts. And from the change in density on the x axis, it seems that there are way more recent acts in the network. Also, yes, I snuck the community detection back in there for the highly connected acts and it seems that one of the communities deals with finance and the other with natural resources.</p>
 <p>One other thing really stuck out is the line of acts that seem to be preserved in the current legislation that were all assented to in 1936.</p>
 <pre class="r"><code>what_a_year &lt;- acts_metrics %&gt;%
   filter(year == 1936) %&gt;% 
   select(name)
 
 kable(what_a_year)</code></pre>
-<p><strong>name</strong><br />
-Civil Liability Act 1936<br />
-Debtors Act 1936<br />
-Explosives Act 1936<br />
-Land Tax Act 1936<br />
-Landlord and Tennant Act 1936<br />
-Law of Property Act 1936<br />
-Limitation of Actions Act 1936<br />
-Lottery and Gamy Act 1936<br />
-Mercantile Act 1936<br />
-Oaths Act 1936<br />
-Redundant Officers Fund Act 1936<br />
-Trustee Act 1936<br />
-Wills Act 1936</p>
+<table>
+<thead>
+<tr class="header">
+<th align="left">name</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">Civil Liability Act 1936</td>
+</tr>
+<tr class="even">
+<td align="left">Debtors Act 1936</td>
+</tr>
+<tr class="odd">
+<td align="left">Explosives Act 1936</td>
+</tr>
+<tr class="even">
+<td align="left">Land Tax Act 1936</td>
+</tr>
+<tr class="odd">
+<td align="left">Landlord and Tenant Act 1936</td>
+</tr>
+<tr class="even">
+<td align="left">Law of Property Act 1936</td>
+</tr>
+<tr class="odd">
+<td align="left">Limitation of Actions Act 1936</td>
+</tr>
+<tr class="even">
+<td align="left">Lottery and Gaming Act 1936</td>
+</tr>
+<tr class="odd">
+<td align="left">Mercantile Law Act 1936</td>
+</tr>
+<tr class="even">
+<td align="left">Oaths Act 1936</td>
+</tr>
+<tr class="odd">
+<td align="left">Redundant Officers Fund Act 1936</td>
+</tr>
+<tr class="even">
+<td align="left">Trustee Act 1936</td>
+</tr>
+<tr class="odd">
+<td align="left">Wills Act 1936</td>
+</tr>
+</tbody>
+</table>
 <p>What happened in 1936 or what is it about these acts that has meant they have endured?</p>
 </div>
 <div id="make-an-interactive-plot" class="section level2">
