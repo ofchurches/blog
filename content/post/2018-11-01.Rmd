@@ -35,7 +35,7 @@ This was easier than I thought. South Australia is super progressive with its us
 ##A list of legislation
 The current legislation is in a folder called "A" (for "Acts"). 
 
-```{r}
+```{r message=FALSE, warning=FALSE}
 library(here)
 library(striprtf)
 library(tidyverse)
@@ -55,7 +55,7 @@ acts <- list.files(path = here("static", "A"),
 
 ## Look for mentions
 For some inexplicable reason the content of the acts is stored in rich text format. But `striprtf::read_rtf` works well.
-```{r}
+```{r message=FALSE, warning=FALSE}
 content <- ""
 for (n in 1:nrow(acts)) {
   content[n] <- read_rtf(here("static", "A", acts$directory[n])) %>%
@@ -67,7 +67,7 @@ content <- tibble(content)
 acts_content <- bind_cols(acts, content)
 ```
 Puling the mentioned acts out of the content required a bit of regex.
-```{r}
+```{r message=FALSE, warning=FALSE}
 acts_mentions <- acts_content %>%
   mutate(content = str_replace_all(content, "\\s+", " ")) %>% 
   mutate(to = str_extract_all(content, paste(as.character(from), collapse="|"))) %>%
@@ -78,13 +78,13 @@ acts_mentions <- acts_content %>%
 ## Make the graph
 I tried and failed with a few differed regex approaches. Eventually I settled on this:
 
-Full, confession: I aquired some`tidygraph` and `ggraph` hex-stickers at UseR2018 
+Full, confession: I acquired some `tidygraph` and `ggraph` hex-stickers at UseR2018 
 
-<img src = "/laptop_stickers.jpg" alt="" />
+![laptop stickers](/post/2018-11-01_files/laptop_stickers.JPG){width=50%}
 
 but haven't really put the packages to good use. So, this was an opportunity.
 
-```{r}
+```{r message=FALSE, warning=FALSE, out.width = '90%', fig.align = "center"}
 acts_graph <- as_tbl_graph(acts_mentions, directed = FALSE) %>% 
     mutate(community = as.factor(group_walktrap())) %>%
   mutate(centrality = centrality_degree())
@@ -96,12 +96,13 @@ ggraph(acts_graph, layout = 'graphopt', charge = .05) +
     theme_graph() + 
   labs(title = str_wrap("Hairball of active legislation in South Australia November 2018", 50), caption = "Colour is the result of community detection and like the rest of the plot fulfils no explanatory purpose")
 ```
+
 Ok, I should move on and never talk of that again.
 
 ## Explore the metrics
 A decent place to start would be a histogram of the centrality of each act in the network.
 
-```{r}
+```{r message=FALSE, warning=FALSE}
 acts_metrics <- acts_graph %>%
   activate(nodes) %>%
   as.tibble()
@@ -114,7 +115,7 @@ So, there are way more acts with few connections than there are acts with many c
 
 Something that would be interesting to check would be the relationship between the centrality of the acts and the year the act was assented to by the Governor.
 
-```{r}
+```{r message=FALSE, warning=FALSE}
 acts_metrics <- acts_metrics %>%
   mutate(year = str_sub(name, -4, -1)) %>%
   mutate(year = as.numeric(year))
@@ -127,7 +128,7 @@ ggplot(data = acts_metrics, aes(x = year, y = centrality)) +
 So the more recent acts are also the more interlinked acts. And from the change in density on the x axis, it seems that there are way more recent acts in the network. Also, yes, I snuck the community detection back in there for the highly connected acts and it seems that one of the communities deals with finance and the other with natural resources.
 
 One other thing really stuck out is the line of acts that seem to be preserved in the current legislation that were all assented to in 1936.
-```{r}
+```{r message=FALSE, warning=FALSE}
 what_a_year <- acts_metrics %>%
   filter(year == 1936) %>% 
   select(name)

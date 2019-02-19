@@ -40,49 +40,12 @@ tags:
 <div id="a-list-of-legislation" class="section level2">
 <h2>A list of legislation</h2>
 <p>The current legislation is in a folder called “A” (for “Acts”).</p>
-<pre class="r"><code>library(here)</code></pre>
-<pre><code>## here() starts at /Users/hannahkeage/R_projects/blog/blog</code></pre>
-<pre class="r"><code>library(striprtf)
-library(tidyverse)</code></pre>
-<pre><code>## ── Attaching packages ─────────────────────────────────────────────── tidyverse 1.2.1 ──</code></pre>
-<pre><code>## ✔ ggplot2 3.0.0     ✔ purrr   0.2.4
-## ✔ tibble  1.4.2     ✔ dplyr   0.7.6
-## ✔ tidyr   0.8.1     ✔ stringr 1.3.1
-## ✔ readr   1.1.1     ✔ forcats 0.3.0</code></pre>
-<pre><code>## ── Conflicts ────────────────────────────────────────────────── tidyverse_conflicts() ──
-## ✖ dplyr::filter() masks stats::filter()
-## ✖ dplyr::lag()    masks stats::lag()</code></pre>
-<pre class="r"><code>library(tidygraph)</code></pre>
-<pre><code>## 
-## Attaching package: &#39;tidygraph&#39;</code></pre>
-<pre><code>## The following object is masked from &#39;package:stats&#39;:
-## 
-##     filter</code></pre>
-<pre class="r"><code>library(igraph)</code></pre>
-<pre><code>## 
-## Attaching package: &#39;igraph&#39;</code></pre>
-<pre><code>## The following object is masked from &#39;package:tidygraph&#39;:
-## 
-##     groups</code></pre>
-<pre><code>## The following objects are masked from &#39;package:dplyr&#39;:
-## 
-##     as_data_frame, groups, union</code></pre>
-<pre><code>## The following objects are masked from &#39;package:purrr&#39;:
-## 
-##     compose, simplify</code></pre>
-<pre><code>## The following object is masked from &#39;package:tidyr&#39;:
-## 
-##     crossing</code></pre>
-<pre><code>## The following object is masked from &#39;package:tibble&#39;:
-## 
-##     as_data_frame</code></pre>
-<pre><code>## The following objects are masked from &#39;package:stats&#39;:
-## 
-##     decompose, spectrum</code></pre>
-<pre><code>## The following object is masked from &#39;package:base&#39;:
-## 
-##     union</code></pre>
-<pre class="r"><code>library(ggraph)
+<pre class="r"><code>library(here)
+library(striprtf)
+library(tidyverse)
+library(tidygraph)
+library(igraph)
+library(ggraph)
 library(ggrepel)
 library(knitr)
 
@@ -115,8 +78,11 @@ acts_content &lt;- bind_cols(acts, content)</code></pre>
 <div id="make-the-graph" class="section level2">
 <h2>Make the graph</h2>
 <p>I tried and failed with a few differed regex approaches. Eventually I settled on this:</p>
-<p>Full, confession: I aquired some<code>tidygraph</code> and <code>ggraph</code> hex-stickers at UseR2018</p>
-<p><img src = "/laptop_stickers.jpg" alt="" /></p>
+<p>Full, confession: I acquired some <code>tidygraph</code> and <code>ggraph</code> hex-stickers at UseR2018</p>
+<div class="figure">
+<img src="/post/2018-11-01_files/laptop_stickers.JPG" alt="laptop stickers" style="width:50.0%" />
+<p class="caption">laptop stickers</p>
+</div>
 <p>but haven’t really put the packages to good use. So, this was an opportunity.</p>
 <pre class="r"><code>acts_graph &lt;- as_tbl_graph(acts_mentions, directed = FALSE) %&gt;% 
     mutate(community = as.factor(group_walktrap())) %&gt;%
@@ -128,7 +94,8 @@ ggraph(acts_graph, layout = &#39;graphopt&#39;, charge = .05) +
   guides(colour = FALSE) + 
     theme_graph() + 
   labs(title = str_wrap(&quot;Hairball of active legislation in South Australia November 2018&quot;, 50), caption = &quot;Colour is the result of community detection and like the rest of the plot fulfils no explanatory purpose&quot;)</code></pre>
-<p><img src="/post/2018-11-01_files/figure-html/unnamed-chunk-4-1.png" width="672" /> Ok, I should move on and never talk of that again.</p>
+<p><img src="/post/2018-11-01_files/figure-html/unnamed-chunk-4-1.png" width="90%" style="display: block; margin: auto;" /></p>
+<p>Ok, I should move on and never talk of that again.</p>
 </div>
 <div id="explore-the-metrics" class="section level2">
 <h2>Explore the metrics</h2>
