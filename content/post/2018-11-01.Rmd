@@ -12,7 +12,9 @@ tags:
 #Background
 I joined the public service in 2017. Pretty soon after I started my boss and new colleagues suggested that the most important thing for me to read would be the legislation that I work under^[Which happens to be the [Children and Young People (Oversight and Advocacy Bodies) Act 2016](https://www.legislation.sa.gov.au/LZ/C/A/CHILDREN%20AND%20YOUNG%20PEOPLE%20(OVERSIGHT%20AND%20ADVOCACY%20BODIES)%20ACT%202016.aspx)]. 
 
-The thing is, when reading *my* legislation, I realised that it referenced several other pieces of legislation. This meant that to fully understand *my* legislation I also had to read these referenced pieces of legislation. But guess what? All these pieces of legislation also referenced other pieces of legislation. I realised that this could go on for quite some time!
+The thing is, when reading my legislation, I realised that it referenced several other pieces of legislation. This meant that to fully understand my legislation I also had to read these referenced pieces of legislation. But guess what? All these pieces of legislation also referenced other pieces of legislation. And of course this meant that there could be other pieces of legislation that mentioned my piece of legislation.
+
+I realised that this could go on for quite some time!
 
 Also, I realised that this situation really suits a graph solution. In this sense:
 
@@ -26,7 +28,9 @@ My plan was:
 3. Look for mentions of other acts within each act and make an edge list
 4. Make the graph
 5. Explore the network metrics
-6. Make an interactive plot of the whole thing because pictures of graphs are pretty and informative
+6. Make an app that would suggest a 'reading list' of acts asscoaited with a chosen act
+7. Make an interactive plot of the whole thing because pictures of graphs are pretty and informative
+
 
 #So, to work...
 ##Downloading the legislation
@@ -34,6 +38,7 @@ This was easier than I thought. South Australia is super progressive with its us
 
 ##A list of legislation
 The current legislation is in a folder called "A" (for "Acts"). 
+
 
 ```{r message=FALSE, warning=FALSE}
 library(here)
@@ -44,6 +49,7 @@ library(igraph)
 library(ggraph)
 library(ggrepel)
 library(knitr)
+library(networkD3)
 
 acts <- list.files(path = here("static", "A"), 
                         pattern = "rtf$", 
@@ -53,8 +59,11 @@ acts <- list.files(path = here("static", "A"),
   mutate(from = str_extract(directory, ".+?(?=/)"))
 ```
 
+
 ## Look for mentions
 For some inexplicable reason the content of the acts is stored in rich text format. But `striprtf::read_rtf` works well.
+
+
 ```{r message=FALSE, warning=FALSE}
 content <- ""
 for (n in 1:nrow(acts)) {
@@ -66,7 +75,11 @@ content <- tibble(content)
 
 acts_content <- bind_cols(acts, content)
 ```
-Puling the mentioned acts out of the content required a bit of regex.
+
+
+Pulling the mentioned acts out of the content required a bit of regex. I tried and failed with a few differed regex approaches. Eventually I settled on this:
+
+
 ```{r message=FALSE, warning=FALSE}
 acts_mentions <- acts_content %>%
   mutate(content = str_replace_all(content, "\\s+", " ")) %>% 
@@ -75,16 +88,19 @@ acts_mentions <- acts_content %>%
   select(from, to)
 ```
 
+
 ## Make the graph
-I tried and failed with a few differed regex approaches. Eventually I settled on this:
+Full, confession: I acquired some `tidygraph` and `ggraph` hex-stickers at UseR2018. 
 
-Full, confession: I acquired some `tidygraph` and `ggraph` hex-stickers at UseR2018 
 
-![laptop stickers](/post/2018-11-01_files/laptop_stickers.JPG){width=50%}
+<p align="center">
+![](/post/2018-11-01_files/laptop_stickers.JPG){width=30%}
+</p>
 
-but haven't really put the packages to good use. So, this was an opportunity.
 
-```{r message=FALSE, warning=FALSE, out.width = '90%', fig.align = "center"}
+But I haven't really put the packages to good use. So, this was an opportunity.
+
+```{r message=FALSE, warning=FALSE}
 acts_graph <- as_tbl_graph(acts_mentions, directed = FALSE) %>% 
     mutate(community = as.factor(group_walktrap())) %>%
   mutate(centrality = centrality_degree())
@@ -94,10 +110,10 @@ ggraph(acts_graph, layout = 'graphopt', charge = .05) +
     geom_node_point(aes(colour = community, size = centrality), alpha = .3) + 
   guides(colour = FALSE) + 
     theme_graph() + 
-  labs(title = str_wrap("Hairball of active legislation in South Australia November 2018", 50), caption = "Colour is the result of community detection and like the rest of the plot fulfils no explanatory purpose")
+  labs(title = str_wrap("Hairball of active legislation in South Australia November 2018", 50), caption = "Colour is the result of community detection")
 ```
 
-Ok, I should move on and never talk of that again.
+Ok, that needs some work before it makes any sense.
 
 ## Explore the metrics
 A decent place to start would be a histogram of the centrality of each act in the network.
@@ -111,6 +127,7 @@ ggplot(data = acts_metrics, aes(x = centrality)) +
   geom_histogram(binwidth = 2) + 
   labs(title = str_wrap("Histogram of centrality of acts in the network of legislation in South Australia, November 2018", 70))
 ```
+
 So, there are way more acts with few connections than there are acts with many connection. Its not quite on the scale of a power law though.
 
 Something that would be interesting to check would be the relationship between the centrality of the acts and the year the act was assented to by the Governor.
@@ -125,6 +142,7 @@ ggplot(data = acts_metrics, aes(x = year, y = centrality)) +
   geom_label_repel(data = subset(acts_metrics, centrality > 30), 
                   aes(label = name, fill = community))
 ```
+
 So the more recent acts are also the more interlinked acts. And from the change in density on the x axis, it seems that there are way more recent acts in the network. Also, yes, I snuck the community detection back in there for the highly connected acts and it seems that one of the communities deals with finance and the other with natural resources.
 
 One other thing really stuck out is the line of acts that seem to be preserved in the current legislation that were all assented to in 1936.
@@ -137,12 +155,21 @@ kable(what_a_year)
 ```
 What happened in 1936 or what is it about these acts that has meant they have endured?
 
+## The reading list
+Here is is, select the act you are primarily interested in and get the names of the other acts that are mentioned in it and that you will need to read as well.
+
+
+<iframe src="https://ofchurches.shinyapps.io/leg_reading_list_app/" width="100%" height="500"></iframe>
+
+
 ## Make an interactive plot
 
 So, the last thing I wanted to do was make an interactive, zoom-able, clickable network of the legislation. Serendipitously, I had just been introduced to the wonderful `networkD3` package via Twitter from some amazing network researchers at Adelaide University:
 
-```{r echo = FALSE}
+
+```{r echo = FALSE, fig.align="center"}
 blogdown::shortcode("tweet", "1060706080374763520")
 ```
 
-So [here](https://ofchurches.shinyapps.io/leg_app) it is. Its worth clicking through to open the `shinyapp` in its own window because its a big network. You can select the name of a piece of legislation to see its place in the network.
+
+This works better as a stand alone `shiny` app which you can access [**here**](https://ofchurches.shinyapps.io/leg_app/). You can drag and zoom it and select the name of a piece of legislation to see its place in the network.

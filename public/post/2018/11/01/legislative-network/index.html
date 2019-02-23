@@ -36,7 +36,8 @@
 <div id="background" class="section level1">
 <h1>Background</h1>
 <p>I joined the public service in 2017. Pretty soon after I started my boss and new colleagues suggested that the most important thing for me to read would be the legislation that I work under<a href="#fn1" class="footnoteRef" id="fnref1"><sup>1</sup></a>.</p>
-<p>The thing is, when reading <em>my</em> legislation, I realised that it referenced several other pieces of legislation. This meant that to fully understand <em>my</em> legislation I also had to read these referenced pieces of legislation. But guess what? All these pieces of legislation also referenced other pieces of legislation. I realised that this could go on for quite some time!</p>
+<p>The thing is, when reading my legislation, I realised that it referenced several other pieces of legislation. This meant that to fully understand my legislation I also had to read these referenced pieces of legislation. But guess what? All these pieces of legislation also referenced other pieces of legislation. And of course this meant that there could be other pieces of legislation that mentioned my piece of legislation.</p>
+<p>I realised that this could go on for quite some time!</p>
 <p>Also, I realised that this situation really suits a graph solution. In this sense:</p>
 <ul>
 <li>acts are nodes</li>
@@ -49,6 +50,7 @@
 <li>Look for mentions of other acts within each act and make an edge list</li>
 <li>Make the graph</li>
 <li>Explore the network metrics</li>
+<li>Make an app that would suggest a ‘reading list’ of acts asscoaited with a chosen act</li>
 <li>Make an interactive plot of the whole thing because pictures of graphs are pretty and informative</li>
 </ol>
 </div>
@@ -69,6 +71,7 @@ library(igraph)
 library(ggraph)
 library(ggrepel)
 library(knitr)
+library(networkD3)
 
 acts &lt;- list.files(path = here(&quot;static&quot;, &quot;A&quot;), 
                         pattern = &quot;rtf$&quot;, 
@@ -89,7 +92,7 @@ for (n in 1:nrow(acts)) {
 content &lt;- tibble(content)
 
 acts_content &lt;- bind_cols(acts, content)</code></pre>
-<p>Puling the mentioned acts out of the content required a bit of regex.</p>
+<p>Pulling the mentioned acts out of the content required a bit of regex. I tried and failed with a few differed regex approaches. Eventually I settled on this:</p>
 <pre class="r"><code>acts_mentions &lt;- acts_content %&gt;%
   mutate(content = str_replace_all(content, &quot;\\s+&quot;, &quot; &quot;)) %&gt;% 
   mutate(to = str_extract_all(content, paste(as.character(from), collapse=&quot;|&quot;))) %&gt;%
@@ -98,13 +101,11 @@ acts_content &lt;- bind_cols(acts, content)</code></pre>
 </div>
 <div id="make-the-graph" class="section level2">
 <h2>Make the graph</h2>
-<p>I tried and failed with a few differed regex approaches. Eventually I settled on this:</p>
-<p>Full, confession: I acquired some <code>tidygraph</code> and <code>ggraph</code> hex-stickers at UseR2018</p>
-<div class="figure">
-<img src="/post/2018-11-01_files/laptop_stickers.JPG" alt="laptop stickers" style="width:50.0%" />
-<p class="caption">laptop stickers</p>
-</div>
-<p>but haven’t really put the packages to good use. So, this was an opportunity.</p>
+<p>Full, confession: I acquired some <code>tidygraph</code> and <code>ggraph</code> hex-stickers at UseR2018.</p>
+<p align="center">
+<img src="/post/2018-11-01_files/laptop_stickers.JPG" style="width:30.0%" />
+</p>
+<p>But I haven’t really put the packages to good use. So, this was an opportunity.</p>
 <pre class="r"><code>acts_graph &lt;- as_tbl_graph(acts_mentions, directed = FALSE) %&gt;% 
     mutate(community = as.factor(group_walktrap())) %&gt;%
   mutate(centrality = centrality_degree())
@@ -114,9 +115,9 @@ ggraph(acts_graph, layout = &#39;graphopt&#39;, charge = .05) +
     geom_node_point(aes(colour = community, size = centrality), alpha = .3) + 
   guides(colour = FALSE) + 
     theme_graph() + 
-  labs(title = str_wrap(&quot;Hairball of active legislation in South Australia November 2018&quot;, 50), caption = &quot;Colour is the result of community detection and like the rest of the plot fulfils no explanatory purpose&quot;)</code></pre>
-<p><img src="/post/2018-11-01_files/figure-html/unnamed-chunk-4-1.png" width="90%" style="display: block; margin: auto;" /></p>
-<p>Ok, I should move on and never talk of that again.</p>
+  labs(title = str_wrap(&quot;Hairball of active legislation in South Australia November 2018&quot;, 50), caption = &quot;Colour is the result of community detection&quot;)</code></pre>
+<p><img src="/post/2018-11-01_files/figure-html/unnamed-chunk-4-1.png" width="672" /></p>
+<p>Ok, that needs some work before it makes any sense.</p>
 </div>
 <div id="explore-the-metrics" class="section level2">
 <h2>Explore the metrics</h2>
@@ -128,7 +129,8 @@ ggraph(acts_graph, layout = &#39;graphopt&#39;, charge = .05) +
 ggplot(data = acts_metrics, aes(x = centrality)) + 
   geom_histogram(binwidth = 2) + 
   labs(title = str_wrap(&quot;Histogram of centrality of acts in the network of legislation in South Australia, November 2018&quot;, 70))</code></pre>
-<p><img src="/post/2018-11-01_files/figure-html/unnamed-chunk-5-1.png" width="672" /> So, there are way more acts with few connections than there are acts with many connection. Its not quite on the scale of a power law though.</p>
+<p><img src="/post/2018-11-01_files/figure-html/unnamed-chunk-5-1.png" width="672" /></p>
+<p>So, there are way more acts with few connections than there are acts with many connection. Its not quite on the scale of a power law though.</p>
 <p>Something that would be interesting to check would be the relationship between the centrality of the acts and the year the act was assented to by the Governor.</p>
 <pre class="r"><code>acts_metrics &lt;- acts_metrics %&gt;%
   mutate(year = str_sub(name, -4, -1)) %&gt;%
@@ -138,7 +140,8 @@ ggplot(data = acts_metrics, aes(x = year, y = centrality)) +
   geom_point() +
   geom_label_repel(data = subset(acts_metrics, centrality &gt; 30), 
                   aes(label = name, fill = community))</code></pre>
-<p><img src="/post/2018-11-01_files/figure-html/unnamed-chunk-6-1.png" width="672" /> So the more recent acts are also the more interlinked acts. And from the change in density on the x axis, it seems that there are way more recent acts in the network. Also, yes, I snuck the community detection back in there for the highly connected acts and it seems that one of the communities deals with finance and the other with natural resources.</p>
+<p><img src="/post/2018-11-01_files/figure-html/unnamed-chunk-6-1.png" width="672" /></p>
+<p>So the more recent acts are also the more interlinked acts. And from the change in density on the x axis, it seems that there are way more recent acts in the network. Also, yes, I snuck the community detection back in there for the highly connected acts and it seems that one of the communities deals with finance and the other with natural resources.</p>
 <p>One other thing really stuck out is the line of acts that seem to be preserved in the current legislation that were all assented to in 1936.</p>
 <pre class="r"><code>what_a_year &lt;- acts_metrics %&gt;%
   filter(year == 1936) %&gt;% 
@@ -195,13 +198,19 @@ kable(what_a_year)</code></pre>
 </table>
 <p>What happened in 1936 or what is it about these acts that has meant they have endured?</p>
 </div>
+<div id="the-reading-list" class="section level2">
+<h2>The reading list</h2>
+<p>Here is is, select the act you are primarily interested in and get the names of the other acts that are mentioned in it and that you will need to read as well.</p>
+<iframe src="https://ofchurches.shinyapps.io/leg_reading_list_app/" width="100%" height="500">
+</iframe>
+</div>
 <div id="make-an-interactive-plot" class="section level2">
 <h2>Make an interactive plot</h2>
 <p>So, the last thing I wanted to do was make an interactive, zoom-able, clickable network of the legislation. Serendipitously, I had just been introduced to the wonderful <code>networkD3</code> package via Twitter from some amazing network researchers at Adelaide University:</p>
 <blockquote class="twitter-tweet"><p lang="en" dir="ltr">I used <a href="https://twitter.com/ChrisGandrud?ref_src=twsrc%5Etfw">@ChrisGandrud</a>&#39;s networkD3 package which can convert from an igraph object :) <br>I agree, the animation is very satisfying!</p>&mdash; Michelle Edwards (@maths_michelle) <a href="https://twitter.com/maths_michelle/status/1060706080374763520?ref_src=twsrc%5Etfw">November 9, 2018</a></blockquote>
 <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
 
-<p>So <a href="https://ofchurches.shinyapps.io/leg_app">here</a> it is. Its worth clicking through to open the <code>shinyapp</code> in its own window because its a big network. You can select the name of a piece of legislation to see its place in the network.</p>
+<p>This works better as a stand alone <code>shiny</code> app which you can access <a href="https://ofchurches.shinyapps.io/leg_app/"><strong>here</strong></a>. You can drag and zoom it and select the name of a piece of legislation to see its place in the network.</p>
 </div>
 </div>
 <div class="footnotes">
