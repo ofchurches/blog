@@ -84,8 +84,9 @@ Pulling the mentioned acts out of the content required a bit of regex. I tried a
 acts_mentions <- acts_content %>%
   mutate(content = str_replace_all(content, "\\s+", " ")) %>% 
   mutate(to = str_extract_all(content, paste(as.character(from), collapse="|"))) %>%
-  unnest(to) %>%
-  select(from, to)
+  select(from, to) %>%
+  unnest(to)
+
 ```
 
 
@@ -101,7 +102,10 @@ Full, confession: I acquired some `tidygraph` and `ggraph` hex-stickers at UseR2
 But I haven't really put the packages to good use. So, this was an opportunity.
 
 ```{r message=FALSE, warning=FALSE}
-acts_graph <- as_tbl_graph(acts_mentions, directed = FALSE) %>% 
+nodes <- acts$from %>%
+  data_frame()
+
+acts_graph <- tbl_graph(nodes = nodes, edges = acts_mentions, directed = FALSE) %>% 
     mutate(community = as.factor(group_walktrap())) %>%
   mutate(centrality = centrality_degree())
 
@@ -134,6 +138,7 @@ Something that would be interesting to check would be the relationship between t
 
 ```{r message=FALSE, warning=FALSE}
 acts_metrics <- acts_metrics %>%
+  rename(name = ".") %>%
   mutate(year = str_sub(name, -4, -1)) %>%
   mutate(year = as.numeric(year))
 
