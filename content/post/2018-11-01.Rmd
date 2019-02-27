@@ -28,7 +28,7 @@ My plan was:
 3. Look for mentions of other acts within each act and make an edge list
 4. Make the graph
 5. Explore the network metrics
-6. Make an app that would suggest a 'reading list' of acts asscoaited with a chosen act
+6. Make an app that would suggest a 'reading list' of acts associated with a chosen act
 7. Make an interactive plot of the whole thing because pictures of graphs are pretty and informative
 
 
@@ -102,10 +102,7 @@ Full, confession: I acquired some `tidygraph` and `ggraph` hex-stickers at UseR2
 But I haven't really put the packages to good use. So, this was an opportunity.
 
 ```{r message=FALSE, warning=FALSE}
-nodes <- acts$from %>%
-  data_frame()
-
-acts_graph <- tbl_graph(nodes = nodes, edges = acts_mentions, directed = FALSE) %>% 
+acts_graph <- as_tbl_graph(acts_mentions, directed = FALSE) %>% 
     mutate(community = as.factor(group_walktrap())) %>%
   mutate(centrality = centrality_degree())
 
@@ -114,22 +111,58 @@ ggraph(acts_graph, layout = 'graphopt', charge = .05) +
     geom_node_point(aes(colour = community, size = centrality), alpha = .3) + 
   guides(colour = FALSE) + 
     theme_graph() + 
-  labs(title = str_wrap("Hairball of active legislation in South Australia November 2018", 50), caption = "Colour is the result of community detection")
+  labs(title = str_wrap("Hairball of active legislation with at least one edge (including loops) in South Australia November 2018", 50), caption = "Colour is the result of community detection")
 ```
 
-Ok, that needs some work before it makes any sense.
+Ok, that needs some work before it makes any sense. The most useful thing might be trimming off the least connected acts.
+
+
+```{r message=FALSE, warning=FALSE}
+ggraph(filter(acts_graph, centrality > 8), layout = 'graphopt', charge = .05) + 
+    geom_edge_link(alpha = .8) + 
+    geom_node_point(aes(colour = community, size = centrality), alpha = .8) + 
+  guides(colour = FALSE) + 
+    theme_graph() + 
+  labs(title = str_wrap("Hairball of active legislation with more than eight edges (including loops) in South Australia November 2018", 50), subtitle = "Includng nodes with degree greater than eight (including loops)", caption = "Colour is the result of community detection")
+```
+
+
+This looks a bit more promising. There seem to be two majour clusters in the network. Lets have a look at the most connected acts in each of the clusters.
+
+
+```{r message=FALSE, warning=FALSE}
+acts_top <- acts_graph %>%
+  activate(nodes) %>%
+  as_tibble() %>%
+  filter(community %in% c(1,2)) %>%
+  group_by(community) %>%
+  top_n(10) %>%
+  ungroup()
+
+ggplot(data = acts_top, aes(x = fct_reorder(name, centrality), y = centrality, fill = community)) + 
+  geom_col() + 
+  facet_wrap(vars(community), nrow = 2, scales = "free") + 
+  coord_flip() + 
+  guides(fill = FALSE) + 
+  labs(title = str_wrap("Top ten most connected acts in the two largest communities", 40), x = "name")
+  
+```
+
+
+So it seems that one of the clusters (number 2) is strongly related to the management of the natural environment. The other cluster shown here (number 1) is a collection of administrative functions to do with levels of government and finance.
 
 ## Explore the metrics
 A decent place to start would be a histogram of the centrality of each act in the network.
 
+
 ```{r message=FALSE, warning=FALSE}
 acts_metrics <- acts_graph %>%
   activate(nodes) %>%
-  as.tibble()
+  as_tibble()
 
 ggplot(data = acts_metrics, aes(x = centrality)) + 
   geom_histogram(binwidth = 2) + 
-  labs(title = str_wrap("Histogram of centrality of acts in the network of legislation in South Australia, November 2018", 70))
+  labs(title = str_wrap("Histogram of centrality of acts with at least one edge (including loops) in the network of legislation in South Australia, November 2018", 70))
 ```
 
 So, there are way more acts with few connections than there are acts with many connection. Its not quite on the scale of a power law though.
@@ -138,7 +171,6 @@ Something that would be interesting to check would be the relationship between t
 
 ```{r message=FALSE, warning=FALSE}
 acts_metrics <- acts_metrics %>%
-  rename(name = ".") %>%
   mutate(year = str_sub(name, -4, -1)) %>%
   mutate(year = as.numeric(year))
 
@@ -148,7 +180,7 @@ ggplot(data = acts_metrics, aes(x = year, y = centrality)) +
                   aes(label = name, fill = community))
 ```
 
-So the more recent acts are also the more interlinked acts. And from the change in density on the x axis, it seems that there are way more recent acts in the network. Also, yes, I snuck the community detection back in there for the highly connected acts and it seems that one of the communities deals with finance and the other with natural resources.
+So the more recent acts are also the more interlinked acts. And from the change in density on the x axis, it seems that there are way more recent acts in the network. Also, yes, I snuck the community detection back in there for the highly connected acts and it seems that the highly connected acts we identified above as being in the largest clusters are also all quite recently accented to.
 
 One other thing really stuck out is the line of acts that seem to be preserved in the current legislation that were all assented to in 1936.
 ```{r message=FALSE, warning=FALSE}
