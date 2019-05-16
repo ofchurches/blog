@@ -1,0 +1,288 @@
+---
+title: Its my pleasure
+author: ''
+date: '2019-05-16'
+slug: its-my-pleasure
+categories: []
+tags:
+  - networks
+  - recommendation engines
+  - ai ethics
+---
+
+
+#Background
+
+When we look for a film to watch on Netflix, the interface we see presents us not with an open list of all the movies stored on the service but rather with a curated, personal set of recommendations for films. Similar processes guide us to find food to eat, friends to meet and lead us toward our choices whenever we interact withe the world through an online platform.
+
+These recommendations are produced through a class of machine learning algorithms called *recommendation engines*. In short, by constraining our choices, recommendation engines give us a shortcut to our own personal pleasures.
+
+Current recommendation engines are a marvel of artificial intelligence programming. The economic incentive to provide customers with recommendations that are more likely to increase consumption has driven online platforms to invest heavily in the refinement of their code^[Netflix lead the way with a particularly influential  [competition](https://www.wired.com/2009/09/how-the-netflix-prize-was-won/)].
+
+But for all the increased purchases and add views these algorithms bring, there are costs to individuals and society that are increasingly being detected and described. In the case of YouTube, both the nature of the alarming content that is routinely recommended and an explanation of the way the recommendation engine works have been detailed by [Guillaume Chaslot](https://medium.com/@guillaumechaslot/how-youtubes-a-i-boosts-alternative-facts-3cc276f47cf7)^[Also see [this](https://algotransparency.org) amazing demonstration of how the recommendation engines work]. This research was followed up by detailed articles in [The Guardian](www.theguardian.com/technology/2018/feb/02/youtube-algorithm-election-clinton-trump-guillaume-chaslot) by Paul Lewis and Erin McCormick.
+
+Last week, Silvia Milano, Mariarosaria Taddeo and Luciano Floridi^[One has to wonder about the decision to include a link to the paper though academia.edu, which is a for-profit company using an opaque recommendation engine to maintain users within its system, a problem that is well detailed [here](https://www.forbes.com/sites/drsarahbond/2017/01/23/dear-scholars-delete-your-account-at-academia-edu/#3759d9322d62)] published a review of the literature on the ethics of recommendation engines.
+
+```{r echo = FALSE, fig.align="center"}
+blogdown::shortcode("tweet", "1122108944992935942")
+```
+
+The paper provides a proposed taxonomy of the ethical challenges posed by recommendation engines in six domains. In their discussion, the authors note that most of the literature on privacy, fairness and opacity comes from a computer science perspective while the literature on autonomy, maneuverability and polarization comes more from the social sciences. This divide is characteristic of so many discussions in the technology ethics space. So, it seemed like a likely target for a blog post that uses programming to create a social narrative that can be explored as a piece of art.
+
+#What is it we want?
+
+Earlier this year, the excellent Museum of Discovery ([MOD](https://mod.org.au/)) in my home town of Adelaide, sent out a call for scientists and artists to create an installation for their next exhibition which would be on the topic of 'pleasure'^[I did not think through entirely how unpleasant it would become to read what some people associate with pleasure. I have removed some words from this analysis.]. It occurred to me that at the retail end of recommendation engines, whether we are using them to navigate the news, find friends or digest dinner, there is a sense in which we are always asking for the algorithm to deliver us the same thing: our greatest pleasures.
+
+Hence, building and investigating the results from a recommendation engine for pleasure might be an interesting way to make some of the ethical problems with these ubiquitous but unobserved algorithms explicit. All I would need is a large data set containing the degree to which different constructs are judged to be associated with pleasure! But where would one find such a thing?
+
+Luckily my friend [Simon De Deyne](https://simondedeyne.me/) and colleagues have conducted a truly remarkable [study](https://link.springer.com/article/10.3758/s13428-018-1115-7)^[You can [download](https://smallworldofwords.org/articles/2018.DeDeyne.The%20Small%20World%20of%20Words%20English%20word%20association%20norms%20for%20over%2012,000%20cue%20words.BRM.pdf) it for free] of word associations known as the Small World of Words (SWoW). In their experiment (which you can [try](https://smallworldofwords.org/en) for yourself), participants were shown a prompt word and then asked to respond with an associated word. The data set they collected is remarkable. And importantly for this application, one of the prompt words was "pleasure".
+
+Once again, there is a nice graph solution to this in which:
+
+*words are nodes
+*responses are links
+
+So my plan was:
+
+1. Download the SWoW, clean it and arrange it for analysis
+2. Explore what it is that people associate with 'pleasure'
+3. Make an app that would recommend different 'pleasures' to a user
+
+#So to work,
+##Download, clean and arrange the SWoW
+
+A great investigation of this data set has already been done by [Julia Silge](https://juliasilge.com/blog/word-associations/) and the pipeline and preliminary analysis here uses that work. The end of this pipeline creates a classic edge list useful for treating the SWoW data set as a graph.
+
+
+```{r message=FALSE, warning=FALSE}
+library(here)
+library(tidyverse)
+library(knitr)
+library(broom)
+library(ggrepel)
+library(scales)
+library(tidygraph)
+library(ggraph)
+library(igraph)
+library(magrittr)
+
+swow_forward <- readRDS(here("static", "swow_forward.rds"))
+```
+
+##Explore what it is that people assocaite with 'pleasure'
+
+The first thing to do is limit our set to the words that followed 'pleasure'. Then we can look at the most frequently occurring.
+
+```{r message=FALSE, warning=FALSE}
+
+swow_forward %>%
+  filter(from == "pleasure") %>% 
+  count(to, sort = TRUE) %>% 
+  top_n(20) %>%
+  ggplot(aes(fct_reorder(to, n), n)) +
+    geom_col() +
+    coord_flip() +
+    labs(x = "Words used to respond to the prompt 'pleasure'", y  = "Count of times participants responded with each word")
+```
+
+And we can compare the constructs men and women associate with pleasure using Julia Silge's code too.
+
+```{r message=FALSE, warning=FALSE}
+swow_forward %>%
+    filter(from == "pleasure",
+           gender %in% c("Men", "Women")) %>%
+    group_by(to) %>%
+    filter(n() > 10) %>%
+    ungroup %>%
+    count(gender, to, sort = TRUE) %>%
+    spread(gender, n, fill = 0) %>%
+    mutate_if(is.numeric, funs((. + 1) / (sum(.) + 1))) %>%
+    mutate(logratio = log2(Women / Men)) %>%
+    top_n(15, abs(logratio)) %>%
+    ggplot(aes(fct_reorder(to, logratio), logratio, 
+               fill = logratio < 0)) +
+    geom_col(show.legend = FALSE) +
+    coord_flip() +
+    labs(x = NULL, y  = "log odds ratio (Women/Men)",
+         title = "Words that Small World of Words participants associate with pleasure",
+         subtitle = str_wrap("Amongst other things, these differences highlight the perils of recommendation engines designed by men", 80))
+```
+
+And again using Julia Silge's code we can see how our participants conceptions of pleasure change with age.
+
+```{r message=FALSE, warning=FALSE}
+swow_freq <- swow_forward %>%
+  filter(from == "pleasure",
+         age < 80) %>%
+  mutate(age = age %/% 5 * 5) %>%
+  count(age, to) %>%
+  complete(age, to, fill = list(n = 0)) %>%
+  group_by(age) %>%
+  mutate(age_total = sum(n),
+         percent = n / age_total) %>%
+  ungroup() %>%
+  group_by(to) %>%
+  filter(sum(n) > 15) %>%
+  ungroup()
+
+slopes <- swow_freq %>%
+  nest(-to) %>%
+  mutate(models = map(data, ~ glm(cbind(n, age_total) ~ age, ., 
+                                  family = "binomial"))) %>%
+  unnest(map(models, tidy)) %>%
+  filter(term == "age") %>%
+  arrange(estimate) %>%
+  mutate(p.value = p.adjust(p.value))
+
+slopes %>%
+  top_n(6, -p.value) %>%
+  inner_join(swow_freq) %>%
+  ggplot(aes(age, percent)) +
+  geom_point() +
+  geom_smooth() +
+  facet_wrap(~ to) +
+  scale_y_continuous(labels = percent_format()) +
+  labs(x = "Age of participant",
+       y = "Frequency of word in association with pleasure",
+       title = "What words do Small World of Words' participants associate with pleasure?",
+       subtitle = "So the association of pleasure with fun and pain decreases in frequency with age")
+
+```
+
+All these differences highlight the notion that different groups of people have different associations with pleasure. While it would be easy to conclude from this that the personalisation of a recommendation system would then the the logical way to proceed, I feel a cause for concern with this approach.
+
+The challenge to autonomy and personal identity from recommendation engines outlined by Silvia Milano, Mariarosaria Taddeo and Luciano Floridi notes that recommendation engines are not just reflecting users preferences but are active collaborators in creating these preferences:
+
+>"...the recommender system’s model of each user is continuously reconfigured on the basis of the feedback provided by other users’ interactions with the system. In this sense, the system should not be conceptualised as tracking a pre-established user identity and tailoring its recommendations to it, but rather as contributing to the construction of the user identity dynamically"
+>
+
+From this perspective I see two challenges from recommendation engines:
+
+1. Users come to believe that the pleasures shown to them are the pleasures shared by society at large or at least a considerably large number of people.
+2. The possibilities of other pleasures are hidden from users so that they are less able to expand their horizons or even come into constant with contrasting views.
+
+These risks amount to a problem for the growth of users as human beings. It is through meeting alternate views of the world and coming to terms with the existence of other minds that we grow.
+
+To highlight these risks I thought a recommendation engine for pleasure might help.
+
+##Make an app to recommend pleasure
+
+Thanks to Julia Single's code that I used above, these data were already in an edge list. This let me import the ego network around the word 'pleasure' to Gephi and look at the top 20 degree nodes:
+
+```{r echo = FALSE}
+blogdown::shortcode("youtube", "Afd5AydCd_o")
+```
+
+To build the recommendation engine I again used `tidygraph` and `ggraph`. This meant first extracting the ego network around "pleasure" from the full SWoW data set.
+
+Then I added some node characteristics:
+
+* Centrality
+* Community
+
+I also included:
+
+* Only the strongest edges 
+* Only the most connected nodes
+
+```{r message=FALSE, warning=FALSE}
+pleasure_ego_undirected <- swow_forward %>%
+  select(from, to) %>%
+  graph_from_data_frame() %>%
+  make_ego_graph(nodes = "pleasure", order = 1, mode = "all") %>%
+  extract2(1) %>%
+  as_tbl_graph(directed = FALSE)
+
+pleasure_ego_trim <- pleasure_ego_undirected %>%
+  activate(edges) %>%
+  group_by(from, to) %>%
+  mutate(weight = sum(n())) %>%
+  ungroup() %>%
+  distinct() %>%
+  filter(weight > 10) %>%
+  activate(nodes) %>%
+  mutate(community = as.factor(group_walktrap())) %>%
+  mutate(centrality = centrality_degree())  %>%
+  top_n(100, centrality) %>%
+  mutate(name = as.character(name))
+```
+
+Community detection often ends up with a few large, well characterized communities then a large number of small communities with one or two nodes in them.
+
+```{r message=FALSE, warning=FALSE}
+pleasure_ego_trim %>%
+  activate(nodes) %>%
+  as.tibble() %>%
+  count(community) %>%
+  ggplot(aes(x = fct_reorder(community, n), y = n)) + 
+  geom_col() + 
+  coord_flip() + 
+  labs(x = "community")
+```
+
+So there are four serious communities. I clumped the others into a single community and have a look at their makeup.
+
+```{r message=FALSE, warning=FALSE}
+pleasure_ego_trim <- pleasure_ego_trim %>%
+  activate(nodes) %>%
+  mutate(community = fct_collapse(community, "5" = c("5", "6", "7", "8", "9", 
+                                                     "10", "12", "13", "15", 
+                                                     "16", "19", "20", "27", 
+                                                     "28", "29", "30", "35", "37"))) %>%
+  mutate(id = row_number()) %>%
+  as_tbl_graph()
+
+pleasure_ego_trim %>%
+  activate(nodes) %>%
+  as_tibble() %>%
+  group_by(community) %>%
+  top_n(10) %>%
+  ungroup() %>%
+  ggplot(aes(x = fct_reorder(name, centrality), y = centrality, fill = community)) + 
+  geom_col() + 
+  facet_wrap(vars(community), nrow = 2, scales = "free") + 
+  coord_flip() + 
+  guides(fill = FALSE) + 
+  labs(title = str_wrap("Top ten most connected words in each community", 80), 
+       x = "name", subtitle = "Remember that community 5 is made up of all the smaller communities")
+```
+
+These communities have clustered into somewhat interpretable groups.
+
+1. A community related to sensations especially in the outdoors
+2. Emotions (this community contains 'pleasure' itself)
+3. Cooking and food
+4. To some this community might be antonyms of pleasure. But I feel they may be pleasures for introverts.
+5. This is the community of all the other communities.
+
+Finally, I plotted the ego-network. The most central word in each community is labeled.
+
+```{r message=FALSE, warning=FALSE}
+selected <- c("flower", "happy", "food", "sad", "pain")
+
+ggraph(pleasure_ego_trim, layout = 'graphopt', charge = .05) + 
+  geom_edge_link(alpha = .1, colour = "white") + 
+  geom_node_text(aes(label = if_else(name %in% selected, as.character(name), ""), colour = community), nudge_y = 100) + 
+  geom_node_point(aes(alpha = if_else(name %in% selected, 1, 0), colour = community, size = centrality)) +
+  guides(colour = FALSE, alpha = FALSE, size = FALSE) + 
+  theme_graph(background = "black")
+```
+
+So, the logic of the recommendation engine is to have:
+
+1. An initialization stage in which the user is given a choice of three words from a set of five. Each of the five is a randomly chosen words from each of the five communities in the ego network.
+2. Sum the weights of the edges to each word in the ego network from each of the selected words. Suggest the word with the greatest summed edge weight as the recommended pleasure.
+3. If the recommendation is accepted then add it to the selected words and repeat the step above. If the recommendation is rejected remove it from the ego network and repeat the step above.
+4. Repeat steps 2 and 3 as many times as is useful.
+
+Its a really basic recommendation engine but it gets across the point that if we follow the suggestions of an algorithm we will end up with our preferences being constrained by the priorities of the programmer and the preferences of the public.
+
+You can play with the recommendation engine here:
+
+<iframe src="https://ofchurches.shinyapps.io/its_my_pleasure/" width="100%" height="600"></iframe>
+
+Feel free to tweet [me](https://twitter.com/owenchurches) your results and let me know what you think.
+
+I'm not sure what the best way of handling the ethical problems with recommendation engines is. But I hope this project has highlighted some of the issues. 
+
+Finally, my application for this project to be installed at [UniSA's Museum of Discovery (MOD)](https://mod.org.au/) was accepted! I've worked with the amazing team at [Lightbulb Digital](https://lightbulb.digital/) to make a version of this app that is way more beautiful and informative than I could have done with my amateur programming skills. They've done an amazing job and I'm really excited by the end result. So, from Friday the 24th of May, you can come along to MOD and investigate the the perils of leaving an algorithm to recommend pleasures to you.

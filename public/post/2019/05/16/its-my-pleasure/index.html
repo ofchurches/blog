@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Its my pleasure | Owen Churches&#39;s blog</title>
+    <link rel="stylesheet" href="/css/style.css" />
+    <link rel="stylesheet" href="/css/fonts.css" />
+    
+  </head>
+
+  <body>
+    <nav>
+    <ul class="menu">
+      
+      <li><a href="/">Home</a></li>
+      
+      <li><a href="/about/">About</a></li>
+      
+      <li><a href="/tags/">Tags</a></li>
+      
+    </ul>
+    <hr/>
+    </nav>
+
+<div class="article-meta">
+<h1><span class="title">Its my pleasure</span></h1>
+
+<h2 class="date">2019/05/16</h2>
+</div>
+
+<main>
+
+
+
+<div id="background" class="section level1">
+<h1>Background</h1>
+<p>When we look for a film to watch on Netflix, the interface we see presents us not with an open list of all the movies stored on the service but rather with a curated, personal set of recommendations for films. Similar processes guide us to find food to eat, friends to meet and lead us toward our choices whenever we interact withe the world through an online platform.</p>
+<p>These recommendations are produced through a class of machine learning algorithms called <em>recommendation engines</em>. In short, by constraining our choices, recommendation engines give us a shortcut to our own personal pleasures.</p>
+<p>Current recommendation engines are a marvel of artificial intelligence programming. The economic incentive to provide customers with recommendations that are more likely to increase consumption has driven online platforms to invest heavily in the refinement of their code<a href="#fn1" class="footnoteRef" id="fnref1"><sup>1</sup></a>.</p>
+<p>But for all the increased purchases and add views these algorithms bring, there are costs to individuals and society that are increasingly being detected and described. In the case of YouTube, both the nature of the alarming content that is routinely recommended and an explanation of the way the recommendation engine works have been detailed by <a href="https://medium.com/@guillaumechaslot/how-youtubes-a-i-boosts-alternative-facts-3cc276f47cf7">Guillaume Chaslot</a><a href="#fn2" class="footnoteRef" id="fnref2"><sup>2</sup></a>. This research was followed up by detailed articles in <a href="www.theguardian.com/technology/2018/feb/02/youtube-algorithm-election-clinton-trump-guillaume-chaslot">The Guardian</a> by Paul Lewis and Erin McCormick.</p>
+<p>Last week, Silvia Milano, Mariarosaria Taddeo and Luciano Floridi<a href="#fn3" class="footnoteRef" id="fnref3"><sup>3</sup></a> published a review of the literature on the ethics of recommendation engines.</p>
+<blockquote class="twitter-tweet"><p lang="en" dir="ltr">&quot;Recommender Systems and their Ethical Challenges&quot; - This article presents the first, systematic analysis of the ethical challenges posed by recommender systems.<a href="https://t.co/CIth1Wn8Us">https://t.co/CIth1Wn8Us</a><br> <a href="https://twitter.com/oxfordethicslab?ref_src=twsrc%5Etfw">@oxfordethicslab</a> <a href="https://twitter.com/IEthics?ref_src=twsrc%5Etfw">@IEthics</a> <a href="https://twitter.com/Ethics?ref_src=twsrc%5Etfw">@Ethics</a> <a href="https://twitter.com/WorldSummitAI?ref_src=twsrc%5Etfw">@WorldSummitAI</a> <a href="https://twitter.com/IntHealthAI?ref_src=twsrc%5Etfw">@IntHealthAI</a> <a href="https://twitter.com/GoogleAI?ref_src=twsrc%5Etfw">@GoogleAI</a> <a href="https://twitter.com/OpenAI?ref_src=twsrc%5Etfw">@OpenAI</a></p>&mdash; Luciano Floridi (@Floridi) <a href="https://twitter.com/Floridi/status/1122108944992935942?ref_src=twsrc%5Etfw">April 27, 2019</a></blockquote>
+<script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
+
+<p>The paper provides a proposed taxonomy of the ethical challenges posed by recommendation engines in six domains. In their discussion, the authors note that most of the literature on privacy, fairness and opacity comes from a computer science perspective while the literature on autonomy, maneuverability and polarization comes more from the social sciences. This divide is characteristic of so many discussions in the technology ethics space. So, it seemed like a likely target for a blog post that uses programming to create a social narrative that can be explored as a piece of art.</p>
+</div>
+<div id="what-is-it-we-want" class="section level1">
+<h1>What is it we want?</h1>
+<p>Earlier this year, the excellent Museum of Discovery (<a href="https://mod.org.au/">MOD</a>) in my home town of Adelaide, sent out a call for scientists and artists to create an installation for their next exhibition which would be on the topic of ‘pleasure’<a href="#fn4" class="footnoteRef" id="fnref4"><sup>4</sup></a>. It occurred to me that at the retail end of recommendation engines, whether we are using them to navigate the news, find friends or digest dinner, there is a sense in which we are always asking for the algorithm to deliver us the same thing: our greatest pleasures.</p>
+<p>Hence, building and investigating the results from a recommendation engine for pleasure might be an interesting way to make some of the ethical problems with these ubiquitous but unobserved algorithms explicit. All I would need is a large data set containing the degree to which different constructs are judged to be associated with pleasure! But where would one find such a thing?</p>
+<p>Luckily my friend <a href="https://simondedeyne.me/">Simon De Deyne</a> and colleagues have conducted a truly remarkable <a href="https://link.springer.com/article/10.3758/s13428-018-1115-7">study</a><a href="#fn5" class="footnoteRef" id="fnref5"><sup>5</sup></a> of word associations known as the Small World of Words (SWoW). In their experiment (which you can <a href="https://smallworldofwords.org/en">try</a> for yourself), participants were shown a prompt word and then asked to respond with an associated word. The data set they collected is remarkable. And importantly for this application, one of the prompt words was “pleasure”.</p>
+<p>Once again, there is a nice graph solution to this in which:</p>
+<p><em>words are nodes </em>responses are links</p>
+<p>So my plan was:</p>
+<ol style="list-style-type: decimal">
+<li>Download the SWoW, clean it and arrange it for analysis</li>
+<li>Explore what it is that people associate with ‘pleasure’</li>
+<li>Make an app that would recommend different ‘pleasures’ to a user</li>
+</ol>
+</div>
+<div id="so-to-work" class="section level1">
+<h1>So to work,</h1>
+<div id="download-clean-and-arrange-the-swow" class="section level2">
+<h2>Download, clean and arrange the SWoW</h2>
+<p>A great investigation of this data set has already been done by <a href="https://juliasilge.com/blog/word-associations/">Julia Silge</a> and the pipeline and preliminary analysis here uses that work. The end of this pipeline creates a classic edge list useful for treating the SWoW data set as a graph.</p>
+<pre class="r"><code>library(here)
+library(tidyverse)
+library(knitr)
+library(broom)
+library(ggrepel)
+library(scales)
+library(tidygraph)
+library(ggraph)
+library(igraph)
+library(magrittr)
+
+swow_forward &lt;- readRDS(here(&quot;static&quot;, &quot;swow_forward.rds&quot;))</code></pre>
+</div>
+<div id="explore-what-it-is-that-people-assocaite-with-pleasure" class="section level2">
+<h2>Explore what it is that people assocaite with ‘pleasure’</h2>
+<p>The first thing to do is limit our set to the words that followed ‘pleasure’. Then we can look at the most frequently occurring.</p>
+<pre class="r"><code>swow_forward %&gt;%
+  filter(from == &quot;pleasure&quot;) %&gt;% 
+  count(to, sort = TRUE) %&gt;% 
+  top_n(20) %&gt;%
+  ggplot(aes(fct_reorder(to, n), n)) +
+    geom_col() +
+    coord_flip() +
+    labs(x = &quot;Words used to respond to the prompt &#39;pleasure&#39;&quot;, y  = &quot;Count of times participants responded with each word&quot;)</code></pre>
+<p><img src="/post/2019-05-16-its-my-pleasure_files/figure-html/unnamed-chunk-3-1.png" width="672" /></p>
+<p>And we can compare the constructs men and women associate with pleasure using Julia Silge’s code too.</p>
+<pre class="r"><code>swow_forward %&gt;%
+    filter(from == &quot;pleasure&quot;,
+           gender %in% c(&quot;Men&quot;, &quot;Women&quot;)) %&gt;%
+    group_by(to) %&gt;%
+    filter(n() &gt; 10) %&gt;%
+    ungroup %&gt;%
+    count(gender, to, sort = TRUE) %&gt;%
+    spread(gender, n, fill = 0) %&gt;%
+    mutate_if(is.numeric, funs((. + 1) / (sum(.) + 1))) %&gt;%
+    mutate(logratio = log2(Women / Men)) %&gt;%
+    top_n(15, abs(logratio)) %&gt;%
+    ggplot(aes(fct_reorder(to, logratio), logratio, 
+               fill = logratio &lt; 0)) +
+    geom_col(show.legend = FALSE) +
+    coord_flip() +
+    labs(x = NULL, y  = &quot;log odds ratio (Women/Men)&quot;,
+         title = &quot;Words that Small World of Words participants associate with pleasure&quot;,
+         subtitle = str_wrap(&quot;Amongst other things, these differences highlight the perils of recommendation engines designed by men&quot;, 80))</code></pre>
+<p><img src="/post/2019-05-16-its-my-pleasure_files/figure-html/unnamed-chunk-4-1.png" width="672" /></p>
+<p>And again using Julia Silge’s code we can see how our participants conceptions of pleasure change with age.</p>
+<pre class="r"><code>swow_freq &lt;- swow_forward %&gt;%
+  filter(from == &quot;pleasure&quot;,
+         age &lt; 80) %&gt;%
+  mutate(age = age %/% 5 * 5) %&gt;%
+  count(age, to) %&gt;%
+  complete(age, to, fill = list(n = 0)) %&gt;%
+  group_by(age) %&gt;%
+  mutate(age_total = sum(n),
+         percent = n / age_total) %&gt;%
+  ungroup() %&gt;%
+  group_by(to) %&gt;%
+  filter(sum(n) &gt; 15) %&gt;%
+  ungroup()
+
+slopes &lt;- swow_freq %&gt;%
+  nest(-to) %&gt;%
+  mutate(models = map(data, ~ glm(cbind(n, age_total) ~ age, ., 
+                                  family = &quot;binomial&quot;))) %&gt;%
+  unnest(map(models, tidy)) %&gt;%
+  filter(term == &quot;age&quot;) %&gt;%
+  arrange(estimate) %&gt;%
+  mutate(p.value = p.adjust(p.value))
+
+slopes %&gt;%
+  top_n(6, -p.value) %&gt;%
+  inner_join(swow_freq) %&gt;%
+  ggplot(aes(age, percent)) +
+  geom_point() +
+  geom_smooth() +
+  facet_wrap(~ to) +
+  scale_y_continuous(labels = percent_format()) +
+  labs(x = &quot;Age of participant&quot;,
+       y = &quot;Frequency of word in association with pleasure&quot;,
+       title = &quot;What words do Small World of Words&#39; participants associate with pleasure?&quot;,
+       subtitle = &quot;So the association of pleasure with fun and pain decreases in frequency with age&quot;)</code></pre>
+<p><img src="/post/2019-05-16-its-my-pleasure_files/figure-html/unnamed-chunk-5-1.png" width="672" /></p>
+<p>All these differences highlight the notion that different groups of people have different associations with pleasure. While it would be easy to conclude from this that the personalisation of a recommendation system would then the the logical way to proceed, I feel a cause for concern with this approach.</p>
+<p>The challenge to autonomy and personal identity from recommendation engines outlined by Silvia Milano, Mariarosaria Taddeo and Luciano Floridi notes that recommendation engines are not just reflecting users preferences but are active collaborators in creating these preferences:</p>
+<blockquote>
+<p>“…the recommender system’s model of each user is continuously reconfigured on the basis of the feedback provided by other users’ interactions with the system. In this sense, the system should not be conceptualised as tracking a pre-established user identity and tailoring its recommendations to it, but rather as contributing to the construction of the user identity dynamically”</p>
+</blockquote>
+<p>From this perspective I see two challenges from recommendation engines:</p>
+<ol style="list-style-type: decimal">
+<li>Users come to believe that the pleasures shown to them are the pleasures shared by society at large or at least a considerably large number of people.</li>
+<li>The possibilities of other pleasures are hidden from users so that they are less able to expand their horizons or even come into constant with contrasting views.</li>
+</ol>
+<p>These risks amount to a problem for the growth of users as human beings. It is through meeting alternate views of the world and coming to terms with the existence of other minds that we grow.</p>
+<p>To highlight these risks I thought a recommendation engine for pleasure might help.</p>
+</div>
+<div id="make-an-app-to-recommend-pleasure" class="section level2">
+<h2>Make an app to recommend pleasure</h2>
+<p>Thanks to Julia Single’s code that I used above, these data were already in an edge list. This let me import the ego network around the word ‘pleasure’ to Gephi and look at the top 20 degree nodes:</p>
+
+<div style="position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden;">
+  <iframe src="//www.youtube.com/embed/Afd5AydCd_o" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border:0;" allowfullscreen title="YouTube Video"></iframe>
+</div>
+
+<p>To build the recommendation engine I again used <code>tidygraph</code> and <code>ggraph</code>. This meant first extracting the ego network around “pleasure” from the full SWoW data set.</p>
+<p>Then I added some node characteristics:</p>
+<ul>
+<li>Centrality</li>
+<li>Community</li>
+</ul>
+<p>I also included:</p>
+<ul>
+<li>Only the strongest edges</li>
+<li>Only the most connected nodes</li>
+</ul>
+<pre class="r"><code>pleasure_ego_undirected &lt;- swow_forward %&gt;%
+  select(from, to) %&gt;%
+  graph_from_data_frame() %&gt;%
+  make_ego_graph(nodes = &quot;pleasure&quot;, order = 1, mode = &quot;all&quot;) %&gt;%
+  extract2(1) %&gt;%
+  as_tbl_graph(directed = FALSE)
+
+pleasure_ego_trim &lt;- pleasure_ego_undirected %&gt;%
+  activate(edges) %&gt;%
+  group_by(from, to) %&gt;%
+  mutate(weight = sum(n())) %&gt;%
+  ungroup() %&gt;%
+  distinct() %&gt;%
+  filter(weight &gt; 10) %&gt;%
+  activate(nodes) %&gt;%
+  mutate(community = as.factor(group_walktrap())) %&gt;%
+  mutate(centrality = centrality_degree())  %&gt;%
+  top_n(100, centrality) %&gt;%
+  mutate(name = as.character(name))</code></pre>
+<p>Community detection often ends up with a few large, well characterized communities then a large number of small communities with one or two nodes in them.</p>
+<pre class="r"><code>pleasure_ego_trim %&gt;%
+  activate(nodes) %&gt;%
+  as.tibble() %&gt;%
+  count(community) %&gt;%
+  ggplot(aes(x = fct_reorder(community, n), y = n)) + 
+  geom_col() + 
+  coord_flip() + 
+  labs(x = &quot;community&quot;)</code></pre>
+<p><img src="/post/2019-05-16-its-my-pleasure_files/figure-html/unnamed-chunk-8-1.png" width="672" /></p>
+<p>So there are four serious communities. I clumped the others into a single community and have a look at their makeup.</p>
+<pre class="r"><code>pleasure_ego_trim &lt;- pleasure_ego_trim %&gt;%
+  activate(nodes) %&gt;%
+  mutate(community = fct_collapse(community, &quot;5&quot; = c(&quot;5&quot;, &quot;6&quot;, &quot;7&quot;, &quot;8&quot;, &quot;9&quot;, 
+                                                     &quot;10&quot;, &quot;12&quot;, &quot;13&quot;, &quot;15&quot;, 
+                                                     &quot;16&quot;, &quot;19&quot;, &quot;20&quot;, &quot;27&quot;, 
+                                                     &quot;28&quot;, &quot;29&quot;, &quot;30&quot;, &quot;35&quot;, &quot;37&quot;))) %&gt;%
+  mutate(id = row_number()) %&gt;%
+  as_tbl_graph()
+
+pleasure_ego_trim %&gt;%
+  activate(nodes) %&gt;%
+  as_tibble() %&gt;%
+  group_by(community) %&gt;%
+  top_n(10) %&gt;%
+  ungroup() %&gt;%
+  ggplot(aes(x = fct_reorder(name, centrality), y = centrality, fill = community)) + 
+  geom_col() + 
+  facet_wrap(vars(community), nrow = 2, scales = &quot;free&quot;) + 
+  coord_flip() + 
+  guides(fill = FALSE) + 
+  labs(title = str_wrap(&quot;Top ten most connected words in each community&quot;, 80), 
+       x = &quot;name&quot;, subtitle = &quot;Remember that community 5 is made up of all the smaller communities&quot;)</code></pre>
+<p><img src="/post/2019-05-16-its-my-pleasure_files/figure-html/unnamed-chunk-9-1.png" width="672" /></p>
+<p>These communities have clustered into somewhat interpretable groups.</p>
+<ol style="list-style-type: decimal">
+<li>A community related to sensations especially in the outdoors</li>
+<li>Emotions (this community contains ‘pleasure’ itself)</li>
+<li>Cooking and food</li>
+<li>To some this community might be antonyms of pleasure. But I feel they may be pleasures for introverts.</li>
+<li>This is the community of all the other communities.</li>
+</ol>
+<p>Finally, I plotted the ego-network. The most central word in each community is labeled.</p>
+<pre class="r"><code>selected &lt;- c(&quot;flower&quot;, &quot;happy&quot;, &quot;food&quot;, &quot;sad&quot;, &quot;pain&quot;)
+
+ggraph(pleasure_ego_trim, layout = &#39;graphopt&#39;, charge = .05) + 
+  geom_edge_link(alpha = .1, colour = &quot;white&quot;) + 
+  geom_node_text(aes(label = if_else(name %in% selected, as.character(name), &quot;&quot;), colour = community), nudge_y = 100) + 
+  geom_node_point(aes(alpha = if_else(name %in% selected, 1, 0), colour = community, size = centrality)) +
+  guides(colour = FALSE, alpha = FALSE, size = FALSE) + 
+  theme_graph(background = &quot;black&quot;)</code></pre>
+<p><img src="/post/2019-05-16-its-my-pleasure_files/figure-html/unnamed-chunk-10-1.png" width="672" /></p>
+<p>So, the logic of the recommendation engine is to have:</p>
+<ol style="list-style-type: decimal">
+<li>An initialization stage in which the user is given a choice of three words from a set of five. Each of the five is a randomly chosen words from each of the five communities in the ego network.</li>
+<li>Sum the weights of the edges to each word in the ego network from each of the selected words. Suggest the word with the greatest summed edge weight as the recommended pleasure.</li>
+<li>If the recommendation is accepted then add it to the selected words and repeat the step above. If the recommendation is rejected remove it from the ego network and repeat the step above.</li>
+<li>Repeat steps 2 and 3 as many times as is useful.</li>
+</ol>
+<p>Its a really basic recommendation engine but it gets across the point that if we follow the suggestions of an algorithm we will end up with our preferences being constrained by the priorities of the programmer and the preferences of the public.</p>
+<p>You can play with the recommendation engine here:</p>
+<iframe src="https://ofchurches.shinyapps.io/its_my_pleasure/" width="100%" height="600">
+</iframe>
+<p>Feel free to tweet <a href="https://twitter.com/owenchurches">me</a> your results and let me know what you think.</p>
+<p>I’m not sure what the best way of handling the ethical problems with recommendation engines is. But I hope this project has highlighted some of the issues.</p>
+<p>Finally, my application for this project to be installed at <a href="https://mod.org.au/">UniSA’s Museum of Discovery (MOD)</a> was accepted! I’ve worked with the amazing team at <a href="https://lightbulb.digital/">Lightbulb Digital</a> to make a version of this app that is way more beautiful and informative than I could have done with my amateur programming skills. They’ve done an amazing job and I’m really excited by the end result. So, from Friday the 24th of May, you can come along to MOD and investigate the the perils of leaving an algorithm to recommend pleasures to you.</p>
+</div>
+</div>
+<div class="footnotes">
+<hr />
+<ol>
+<li id="fn1"><p>Netflix lead the way with a particularly influential <a href="https://www.wired.com/2009/09/how-the-netflix-prize-was-won/">competition</a><a href="#fnref1">↩</a></p></li>
+<li id="fn2"><p>Also see <a href="https://algotransparency.org">this</a> amazing demonstration of how the recommendation engines work<a href="#fnref2">↩</a></p></li>
+<li id="fn3"><p>One has to wonder about the decision to include a link to the paper though academia.edu, which is a for-profit company using an opaque recommendation engine to maintain users within its system, a problem that is well detailed <a href="https://www.forbes.com/sites/drsarahbond/2017/01/23/dear-scholars-delete-your-account-at-academia-edu/#3759d9322d62">here</a><a href="#fnref3">↩</a></p></li>
+<li id="fn4"><p>I did not think through entirely how unpleasant it would become to read what some people associate with pleasure. I have removed some words from this analysis.<a href="#fnref4">↩</a></p></li>
+<li id="fn5"><p>You can <a href="https://smallworldofwords.org/articles/2018.DeDeyne.The%20Small%20World%20of%20Words%20English%20word%20association%20norms%20for%20over%2012,000%20cue%20words.BRM.pdf">download</a> it for free<a href="#fnref5">↩</a></p></li>
+</ol>
+</div>
+
+</main>
+
+  <footer>
+  <script src="//yihui.name/js/math-code.js"></script>
+<script async src="//mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML"></script>
+
+<script async src="//yihui.name/js/center-img.js"></script>
+
+  
+  <hr/>
+  &copy; Owen Churches 2018-2019 | <a href="https://github.com/ofchurches">Github</a> | <a href="https://twitter.com/owenchurches">Twitter</a>
+  
+  </footer>
+  </body>
+</html>
+

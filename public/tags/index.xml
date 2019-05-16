@@ -11,6 +11,15 @@
     
     
     <item>
+      <title>ai ethics</title>
+      <link>/tags/ai-ethics/</link>
+      <pubDate>Thu, 16 May 2019 00:00:00 +0000</pubDate>
+      
+      <guid>/tags/ai-ethics/</guid>
+      <description></description>
+    </item>
+    
+    <item>
       <title>legislation</title>
       <link>/tags/legislation/</link>
       <pubDate>Thu, 01 Nov 2018 00:00:00 +0000</pubDate>
@@ -22,9 +31,18 @@
     <item>
       <title>networks</title>
       <link>/tags/networks/</link>
-      <pubDate>Thu, 01 Nov 2018 00:00:00 +0000</pubDate>
+      <pubDate>Thu, 16 May 2019 00:00:00 +0000</pubDate>
       
       <guid>/tags/networks/</guid>
+      <description></description>
+    </item>
+    
+    <item>
+      <title>recommendation engines</title>
+      <link>/tags/recommendation-engines/</link>
+      <pubDate>Thu, 16 May 2019 00:00:00 +0000</pubDate>
+      
+      <guid>/tags/recommendation-engines/</guid>
       <description></description>
     </item>
     
