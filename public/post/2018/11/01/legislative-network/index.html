@@ -64,7 +64,6 @@
 <h2>A list of legislation</h2>
 <p>The current legislation is in a folder called “A” (for “Acts”).</p>
 <pre class="r"><code>library(here)
-library(striprtf)
 library(tidyverse)
 library(tidygraph)
 library(igraph)
@@ -72,29 +71,56 @@ library(ggraph)
 library(ggrepel)
 library(knitr)
 library(networkD3)
+library(readr)
 
-acts &lt;- list.files(path = here(&quot;static&quot;, &quot;A&quot;), 
-                        pattern = &quot;rtf$&quot;, 
-                        recursive = TRUE) %&gt;%
+acts &lt;- list.files(path = here(&quot;static&quot;, &quot;A&quot;)) %&gt;%
   tibble() %&gt;%
-  rename(&quot;directory&quot; = &quot;.&quot;) %&gt;%
-  mutate(from = str_extract(directory, &quot;.+?(?=/)&quot;))</code></pre>
+  rename(&quot;from&quot; = &quot;.&quot;) %&gt;%
+  mutate(directory = list.files(path = here(&quot;static&quot;, &quot;A&quot;), 
+                                full.names = TRUE, 
+                                recursive = TRUE, 
+                                pattern = &quot;rtf$&quot;))</code></pre>
 </div>
 <div id="look-for-mentions" class="section level2">
 <h2>Look for mentions</h2>
-<p>For some inexplicable reason the content of the acts is stored in rich text format. But <code>striprtf::read_rtf</code> works well.</p>
+<p>This was a challenge. The biggest challenge was dealing with <em>rich text format!</em>.</p>
+<p>For some inexplicable reason the content of the acts is stored in rich text format. The <code>striprtf::read_rtf</code> function looked promising but I discovered that the names of the acts are <em>sometimes</em> hyperlinked to the website for that act. And because of this, the whole name of the act is <em>sometimes</em> removed from the document when its imported. Take these examples from my own act:</p>
+<blockquote>
+<p>“under the Equal Opportunity Act 1984 and, conversely”</p>
+<p>—This is how a phrase citing another act renders in the <a href="https://www.legislation.sa.gov.au/LZ/C/A/CHILDREN%20AND%20YOUNG%20PEOPLE%20(OVERSIGHT%20AND%20ADVOCACY%20BODIES)%20ACT%202016/CURRENT/2016.48.AUTH.PDF">pdf</a> of my act.</p>
+</blockquote>
+<blockquote>
+<p>“under the and, conversely”</p>
+<p>—This is how it is imported by <code>read_rtf</code>. The name of the act has disapeared because the name of the act is buried in code that <code>read_rtf</code> helpfully removes!</p>
+</blockquote>
+<p>So, I was left with importing the full underlying code with the hope of writing regex later to pull the names of the acts out.</p>
 <pre class="r"><code>content &lt;- &quot;&quot;
 for (n in 1:nrow(acts)) {
-  content[n] &lt;- read_rtf(here(&quot;static&quot;, &quot;A&quot;, acts$directory[n])) %&gt;%
+  content[n] &lt;- read_file(acts$directory[n]) %&gt;%
     paste(collapse = &quot; &quot;)
 }
 
 content &lt;- tibble(content)
 
 acts_content &lt;- bind_cols(acts, content)</code></pre>
-<p>Pulling the mentioned acts out of the content required a bit of regex. I tried and failed with a few differed regex approaches. Eventually I settled on this:</p>
-<pre class="r"><code>acts_mentions &lt;- acts_content %&gt;%
+<p>Pulling the mentioned acts out of the content required a bit of regex. I tried and failed with many differed regex approaches. After reading through the code and finding how the acts are written, I eventually I settled on doing this in the following steps.</p>
+<ol style="list-style-type: decimal">
+<li>Make all sorts of white space indicators a single white space. Note the use of <code>\\Q</code> at the start and <code>\\E</code> at the end of each pattern that needed to be replaced with a single whitespace. This makes the pattern literal instead of using the regex behaviour of the characters.</li>
+<li>Make all white space a single white space (incase the section above made multiple spaces)</li>
+<li>Remove appostrophes (official names of acts often include them but their file names do not)</li>
+<li>Extract the names of acts from the list of current acts (this limited the mentioned acts to current acts in South Australia - excluding federal acts that are often mentioned in state legislation)</li>
+<li>Unnesting the mentioned acts so that the tibble would be a nice edge list for doing graph work with.</li>
+</ol>
+<pre class="r"><code>acts_prep &lt;- acts_content %&gt;%
+  mutate(content = str_replace_all(content, &quot;\\Q%20\\E&quot;, &quot; &quot;)) %&gt;%
+  mutate(content = str_replace_all(content, &quot;\\Q\\&#39;a0\\E&quot;, &quot; &quot;)) %&gt;%
+  mutate(content = str_replace_all(content, &quot;\\Q\r\n\\E&quot;, &quot; &quot;)) %&gt;%
+  mutate(content = str_replace_all(content, &quot;\\Q\n \n\\E&quot;, &quot; &quot;)) %&gt;%
+  mutate(content = str_replace_all(content, &quot;\\Q\n*|  \n*|\\E&quot;, &quot; &quot;)) %&gt;%
   mutate(content = str_replace_all(content, &quot;\\s+&quot;, &quot; &quot;)) %&gt;% 
+  mutate(content = str_replace_all(content, &quot;&#39;&quot;, &quot;&quot;))
+
+acts_mentions &lt;- acts_prep %&gt;%
   mutate(to = str_extract_all(content, paste(as.character(from), collapse=&quot;|&quot;))) %&gt;%
   select(from, to) %&gt;%
   unnest(to)</code></pre>
@@ -118,30 +144,33 @@ ggraph(acts_graph, layout = &#39;graphopt&#39;, charge = .05) +
   labs(title = str_wrap(&quot;Hairball of active legislation with at least one edge (including loops) in South Australia November 2018&quot;, 50), caption = &quot;Colour is the result of community detection&quot;)</code></pre>
 <p><img src="/post/2018-11-01_files/figure-html/unnamed-chunk-4-1.png" width="672" /></p>
 <p>Ok, that needs some work before it makes any sense. The most useful thing might be trimming off the least connected acts.</p>
-<pre class="r"><code>ggraph(filter(acts_graph, centrality &gt; 8), layout = &#39;graphopt&#39;, charge = .05) + 
-    geom_edge_link(alpha = .8) + 
+<pre class="r"><code>ggraph(filter(acts_graph, centrality &gt; 200), 
+       layout = &#39;igraph&#39;, 
+       algorithm = &quot;nicely&quot;) + 
+    geom_edge_link(alpha = .05) + 
     geom_node_point(aes(colour = community, size = centrality), alpha = .8) + 
   guides(colour = FALSE) + 
     theme_graph() + 
-  labs(title = str_wrap(&quot;Hairball of active legislation with more than eight edges (including loops) in South Australia November 2018&quot;, 50), subtitle = &quot;Includng nodes with degree greater than eight (including loops)&quot;, caption = &quot;Colour is the result of community detection&quot;)</code></pre>
+  labs(title = str_wrap(&quot;(less of a) Hairball of active legislation in South Australia November 2018&quot;, 50), subtitle = &quot;Of nodes with degree greater than two hundred (including loops)&quot;, caption = &quot;Colour is the result of community detection&quot;)</code></pre>
 <p><img src="/post/2018-11-01_files/figure-html/unnamed-chunk-5-1.png" width="672" /></p>
-<p>This looks a bit more promising. There seem to be two majour clusters in the network. Lets have a look at the most connected acts in each of the clusters.</p>
+<p>This looks a bit more promising. There seem to be three majour clusters in the network. Lets have a look at the most connected acts in each of the clusters.</p>
 <pre class="r"><code>acts_top &lt;- acts_graph %&gt;%
+  filter(centrality &gt; 200) %&gt;%
   activate(nodes) %&gt;%
   as_tibble() %&gt;%
-  filter(community %in% c(1,2)) %&gt;%
+  filter(community %in% c(1, 2, 3)) %&gt;%
   group_by(community) %&gt;%
-  top_n(10) %&gt;%
+  top_n(6) %&gt;%
   ungroup()
 
 ggplot(data = acts_top, aes(x = fct_reorder(name, centrality), y = centrality, fill = community)) + 
   geom_col() + 
-  facet_wrap(vars(community), nrow = 2, scales = &quot;free&quot;) + 
+  facet_wrap(vars(community), nrow = 3, scales = &quot;free&quot;) + 
   coord_flip() + 
   guides(fill = FALSE) + 
-  labs(title = str_wrap(&quot;Top ten most connected acts in the two largest communities&quot;, 40), x = &quot;name&quot;)</code></pre>
+  labs(title = str_wrap(&quot;Top ten most connected acts in the three largest communities&quot;, 40), subtitle = &quot;Of nodes with degree greater than two hundred (including loops)&quot;, x = &quot;Act name&quot;)</code></pre>
 <p><img src="/post/2018-11-01_files/figure-html/unnamed-chunk-6-1.png" width="672" /></p>
-<p>So it seems that one of the clusters (number 2) is strongly related to the management of the natural environment. The other cluster shown here (number 1) is a collection of administrative functions to do with levels of government and finance.</p>
+<p>So it seems that cluster 1 is related to administrative arrangements. Of the other two majour clusters, one (number 2) is related to the management of the environment and the other (number 1) is related to the management of human services. So, this clustering makes a lot of sense.</p>
 </div>
 <div id="explore-the-metrics" class="section level2">
 <h2>Explore the metrics</h2>
@@ -151,21 +180,24 @@ ggplot(data = acts_top, aes(x = fct_reorder(name, centrality), y = centrality, f
   as_tibble()
 
 ggplot(data = acts_metrics, aes(x = centrality)) + 
-  geom_histogram(binwidth = 2) + 
+  geom_histogram(binwidth = 10) + 
   labs(title = str_wrap(&quot;Histogram of centrality of acts with at least one edge (including loops) in the network of legislation in South Australia, November 2018&quot;, 70))</code></pre>
 <p><img src="/post/2018-11-01_files/figure-html/unnamed-chunk-7-1.png" width="672" /></p>
-<p>So, there are way more acts with few connections than there are acts with many connection. Its not quite on the scale of a power law though.</p>
+<p>So, there are way more acts with few connections than there are acts with many connections.</p>
 <p>Something that would be interesting to check would be the relationship between the centrality of the acts and the year the act was assented to by the Governor.</p>
 <pre class="r"><code>acts_metrics &lt;- acts_metrics %&gt;%
   mutate(year = str_sub(name, -4, -1)) %&gt;%
   mutate(year = as.numeric(year))
 
-ggplot(data = acts_metrics, aes(x = year, y = centrality)) + 
+ggplot(data = acts_metrics, aes(x = year, y = centrality, colour = community)) + 
   geom_point() +
-  geom_label_repel(data = subset(acts_metrics, centrality &gt; 30), 
-                  aes(label = name, fill = community))</code></pre>
+  scale_y_log10() + 
+  geom_text_repel(data = subset(acts_metrics, centrality &gt; 1500), 
+                  aes(label = name, colour = community)) + 
+  guides(colour = FALSE) + 
+  labs(y = &quot;centrality (log10)&quot;)</code></pre>
 <p><img src="/post/2018-11-01_files/figure-html/unnamed-chunk-8-1.png" width="672" /></p>
-<p>So the more recent acts are also the more interlinked acts. And from the change in density on the x axis, it seems that there are way more recent acts in the network. Also, yes, I snuck the community detection back in there for the highly connected acts and it seems that the highly connected acts we identified above as being in the largest clusters are also all quite recently accented to.</p>
+<p>While its clear that there is more recent legislation is operation than older legislation, its not entirely clear if there is a relationship between centrality and longevity of an act.</p>
 <p>One other thing really stuck out is the line of acts that seem to be preserved in the current legislation that were all assented to in 1936.</p>
 <pre class="r"><code>what_a_year &lt;- acts_metrics %&gt;%
   filter(year == 1936) %&gt;% 

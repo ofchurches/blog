@@ -42,7 +42,6 @@ The current legislation is in a folder called "A" (for "Acts").
 
 ```{r message=FALSE, warning=FALSE}
 library(here)
-library(striprtf)
 library(tidyverse)
 library(tidygraph)
 library(igraph)
@@ -50,24 +49,41 @@ library(ggraph)
 library(ggrepel)
 library(knitr)
 library(networkD3)
+library(readr)
 
-acts <- list.files(path = here("static", "A"), 
-                        pattern = "rtf$", 
-                        recursive = TRUE) %>%
+acts <- list.files(path = here("static", "A")) %>%
   tibble() %>%
-  rename("directory" = ".") %>%
-  mutate(from = str_extract(directory, ".+?(?=/)"))
+  rename("from" = ".") %>%
+  mutate(directory = list.files(path = here("static", "A"), 
+                                full.names = TRUE, 
+                                recursive = TRUE, 
+                                pattern = "rtf$"))
 ```
 
 
 ## Look for mentions
-For some inexplicable reason the content of the acts is stored in rich text format. But `striprtf::read_rtf` works well.
+This was a challenge. The biggest challenge was dealing with *rich text format!*.
+
+For some inexplicable reason the content of the acts is stored in rich text format. The `striprtf::read_rtf` function looked promising but I discovered that the names of the acts are *sometimes* hyperlinked to the website for that act. And because of this, the whole name of the act is *sometimes* removed from the document when its imported. Take these examples from my own act:
+
+
+>"under the Equal Opportunity Act 1984 and, conversely"
+>
+> ---This is how a phrase citing another act renders in the [pdf](https://www.legislation.sa.gov.au/LZ/C/A/CHILDREN%20AND%20YOUNG%20PEOPLE%20(OVERSIGHT%20AND%20ADVOCACY%20BODIES)%20ACT%202016/CURRENT/2016.48.AUTH.PDF) of my act.
+
+
+>"under the  and, conversely"
+>
+> ---This is how it is imported by `read_rtf`. The name of the act has disapeared because the name of the act is buried in code that `read_rtf` helpfully removes!
+
+
+So, I was left with importing the full underlying code with the hope of writing regex later to pull the names of the acts out.
 
 
 ```{r message=FALSE, warning=FALSE}
 content <- ""
 for (n in 1:nrow(acts)) {
-  content[n] <- read_rtf(here("static", "A", acts$directory[n])) %>%
+  content[n] <- read_file(acts$directory[n]) %>%
     paste(collapse = " ")
 }
 
@@ -77,12 +93,25 @@ acts_content <- bind_cols(acts, content)
 ```
 
 
-Pulling the mentioned acts out of the content required a bit of regex. I tried and failed with a few differed regex approaches. Eventually I settled on this:
+Pulling the mentioned acts out of the content required a bit of regex. I tried and failed with many differed regex approaches. After reading through the code and finding how the acts are written, I eventually I settled on doing this in the following steps.
 
+1) Make all sorts of white space indicators a single white space. Note the use of `\\Q` at the start and `\\E` at the end of each pattern that needed to be replaced with a single whitespace. This makes the pattern literal instead of using the regex behaviour of the characters.
+2) Make all white space a single white space (incase the section above made multiple spaces)
+3) Remove appostrophes (official names of acts often include them but their file names do not)
+4) Extract the names of acts from the list of current acts (this limited the mentioned acts to current acts in South Australia - excluding federal acts that are often mentioned in state legislation)
+5) Unnesting the mentioned acts so that the tibble would be a nice edge list for doing graph work with.
 
 ```{r message=FALSE, warning=FALSE}
-acts_mentions <- acts_content %>%
+acts_prep <- acts_content %>%
+  mutate(content = str_replace_all(content, "\\Q%20\\E", " ")) %>%
+  mutate(content = str_replace_all(content, "\\Q\\'a0\\E", " ")) %>%
+  mutate(content = str_replace_all(content, "\\Q\r\n\\E", " ")) %>%
+  mutate(content = str_replace_all(content, "\\Q\n \n\\E", " ")) %>%
+  mutate(content = str_replace_all(content, "\\Q\n*|  \n*|\\E", " ")) %>%
   mutate(content = str_replace_all(content, "\\s+", " ")) %>% 
+  mutate(content = str_replace_all(content, "'", ""))
+
+acts_mentions <- acts_prep %>%
   mutate(to = str_extract_all(content, paste(as.character(from), collapse="|"))) %>%
   select(from, to) %>%
   unnest(to)
@@ -116,40 +145,42 @@ ggraph(acts_graph, layout = 'graphopt', charge = .05) +
 
 Ok, that needs some work before it makes any sense. The most useful thing might be trimming off the least connected acts.
 
-
 ```{r message=FALSE, warning=FALSE}
-ggraph(filter(acts_graph, centrality > 8), layout = 'graphopt', charge = .05) + 
-    geom_edge_link(alpha = .8) + 
+ggraph(filter(acts_graph, centrality > 200), 
+       layout = 'igraph', 
+       algorithm = "nicely") + 
+    geom_edge_link(alpha = .05) + 
     geom_node_point(aes(colour = community, size = centrality), alpha = .8) + 
   guides(colour = FALSE) + 
     theme_graph() + 
-  labs(title = str_wrap("Hairball of active legislation with more than eight edges (including loops) in South Australia November 2018", 50), subtitle = "Includng nodes with degree greater than eight (including loops)", caption = "Colour is the result of community detection")
+  labs(title = str_wrap("(less of a) Hairball of active legislation in South Australia November 2018", 50), subtitle = "Of nodes with degree greater than two hundred (including loops)", caption = "Colour is the result of community detection")
 ```
 
 
-This looks a bit more promising. There seem to be two majour clusters in the network. Lets have a look at the most connected acts in each of the clusters.
+This looks a bit more promising. There seem to be three majour clusters in the network. Lets have a look at the most connected acts in each of the clusters.
 
 
 ```{r message=FALSE, warning=FALSE}
 acts_top <- acts_graph %>%
+  filter(centrality > 200) %>%
   activate(nodes) %>%
   as_tibble() %>%
-  filter(community %in% c(1,2)) %>%
+  filter(community %in% c(1, 2, 3)) %>%
   group_by(community) %>%
-  top_n(10) %>%
+  top_n(6) %>%
   ungroup()
 
 ggplot(data = acts_top, aes(x = fct_reorder(name, centrality), y = centrality, fill = community)) + 
   geom_col() + 
-  facet_wrap(vars(community), nrow = 2, scales = "free") + 
+  facet_wrap(vars(community), nrow = 3, scales = "free") + 
   coord_flip() + 
   guides(fill = FALSE) + 
-  labs(title = str_wrap("Top ten most connected acts in the two largest communities", 40), x = "name")
+  labs(title = str_wrap("Top ten most connected acts in the three largest communities", 40), subtitle = "Of nodes with degree greater than two hundred (including loops)", x = "Act name")
   
 ```
 
 
-So it seems that one of the clusters (number 2) is strongly related to the management of the natural environment. The other cluster shown here (number 1) is a collection of administrative functions to do with levels of government and finance.
+So it seems that cluster 1 is related to administrative arrangements. Of the other two majour clusters, one (number 2) is  related to the management of the environment and the other (number 1) is related to the management of human services. So, this clustering makes a lot of sense.
 
 ## Explore the metrics
 A decent place to start would be a histogram of the centrality of each act in the network.
@@ -161,11 +192,11 @@ acts_metrics <- acts_graph %>%
   as_tibble()
 
 ggplot(data = acts_metrics, aes(x = centrality)) + 
-  geom_histogram(binwidth = 2) + 
+  geom_histogram(binwidth = 10) + 
   labs(title = str_wrap("Histogram of centrality of acts with at least one edge (including loops) in the network of legislation in South Australia, November 2018", 70))
 ```
 
-So, there are way more acts with few connections than there are acts with many connection. Its not quite on the scale of a power law though.
+So, there are way more acts with few connections than there are acts with many connections.
 
 Something that would be interesting to check would be the relationship between the centrality of the acts and the year the act was assented to by the Governor.
 
@@ -174,15 +205,20 @@ acts_metrics <- acts_metrics %>%
   mutate(year = str_sub(name, -4, -1)) %>%
   mutate(year = as.numeric(year))
 
-ggplot(data = acts_metrics, aes(x = year, y = centrality)) + 
+ggplot(data = acts_metrics, aes(x = year, y = centrality, colour = community)) + 
   geom_point() +
-  geom_label_repel(data = subset(acts_metrics, centrality > 30), 
-                  aes(label = name, fill = community))
+  scale_y_log10() + 
+  geom_text_repel(data = subset(acts_metrics, centrality > 1500), 
+                  aes(label = name, colour = community)) + 
+  guides(colour = FALSE) + 
+  labs(y = "centrality (log10)")
 ```
 
-So the more recent acts are also the more interlinked acts. And from the change in density on the x axis, it seems that there are way more recent acts in the network. Also, yes, I snuck the community detection back in there for the highly connected acts and it seems that the highly connected acts we identified above as being in the largest clusters are also all quite recently accented to.
+While its clear that there is more recent legislation is operation than older legislation, its not entirely clear if there is a relationship between centrality and longevity of an act.
 
 One other thing really stuck out is the line of acts that seem to be preserved in the current legislation that were all assented to in 1936.
+
+
 ```{r message=FALSE, warning=FALSE}
 what_a_year <- acts_metrics %>%
   filter(year == 1936) %>% 
