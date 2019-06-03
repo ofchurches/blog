@@ -110,7 +110,7 @@ acts_mentions &lt;- acts_prep %&gt;%
 <p align="center">
 <img src="/post/2018-11-01_files/laptop_stickers.JPG" style="width:30.0%" />
 </p>
-<p>But I haven’t really put the packages to good use. So, this was an opportunity.</p>
+<p>But I haven’t really put the packages to good use. So, this was an opportunity:</p>
 <pre class="r"><code>acts_graph &lt;- as_tbl_graph(acts_mentions, directed = FALSE) %&gt;% 
     mutate(community = as.factor(group_walktrap())) %&gt;%
   mutate(centrality = centrality_degree())
