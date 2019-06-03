@@ -8,3 +8,240 @@ tags:
   - legislation
   - networks
 ---
+#Background
+I joined the public service in 2017. Pretty soon after I started my boss and new colleagues suggested that the most important thing for me to read would be the legislation that I work under^[Which happens to be the [Children and Young People (Oversight and Advocacy Bodies) Act 2016](https://www.legislation.sa.gov.au/LZ/C/A/CHILDREN%20AND%20YOUNG%20PEOPLE%20(OVERSIGHT%20AND%20ADVOCACY%20BODIES)%20ACT%202016.aspx)]. 
+
+The thing is, when reading my legislation, I realised that it referenced several other pieces of legislation. This meant that to fully understand my legislation I also had to read these referenced pieces of legislation. But guess what? All these pieces of legislation also referenced other pieces of legislation. And of course this meant that there could be other pieces of legislation that mentioned my piece of legislation.
+
+I realised that this could go on for quite some time!
+
+Also, I realised that this situation really suits a graph solution. In this sense:
+
+* acts are nodes
+* mentions of acts are links
+
+My plan was:
+
+1. Download all the legislation active in South Australia at the moment
+2. Make a list of all the legislation
+3. Look for mentions of other acts within each act and make an edge list
+4. Make the graph
+5. Explore the network metrics
+6. Make an app that would suggest a 'reading list' of acts associated with a chosen act
+7. Make an interactive plot of the whole thing because pictures of graphs are pretty and informative
+
+
+#So, to work...
+##Downloading the legislation
+This was easier than I thought. South Australia is super progressive with its use of open data and there is a copy of all legislation [currently in use](https://data.sa.gov.au/data/dataset/legislative-database). Impressively, this is updated every two weeks^[And the previous updates are stored giving a snapshot of legislation active every two week. This raises the possibility of looking at the way legislation has evolved.]
+
+##A list of legislation
+The current legislation is in a folder called "A" (for "Acts"). 
+
+
+```{r message=FALSE, warning=FALSE}
+library(here)
+library(tidyverse)
+library(tidygraph)
+library(igraph)
+library(ggraph)
+library(ggrepel)
+library(knitr)
+library(networkD3)
+library(readr)
+
+acts <- list.files(path = here("static", "A")) %>%
+  tibble() %>%
+  rename("from" = ".") %>%
+  mutate(directory = list.files(path = here("static", "A"), 
+                                full.names = TRUE, 
+                                recursive = TRUE, 
+                                pattern = "rtf$"))
+```
+
+
+## Look for mentions
+This was a challenge. The biggest challenge was dealing with *rich text format!*.
+
+For some inexplicable reason the content of the acts is stored in rich text format. The `striprtf::read_rtf` function looked promising but I discovered that the names of the acts are *sometimes* hyperlinked to the website for that act. And because of this, the whole name of the act is *sometimes* removed from the document when its imported. Take these examples from my own act:
+
+
+>"under the Equal Opportunity Act 1984 and, conversely"
+>
+> ---This is how a phrase citing another act renders in the [pdf](https://www.legislation.sa.gov.au/LZ/C/A/CHILDREN%20AND%20YOUNG%20PEOPLE%20(OVERSIGHT%20AND%20ADVOCACY%20BODIES)%20ACT%202016/CURRENT/2016.48.AUTH.PDF) of my act.
+
+
+>"under the  and, conversely"
+>
+> ---This is how it is imported by `read_rtf`. The name of the act has disapeared because the name of the act is buried in code that `read_rtf` helpfully removes!
+
+
+So, I was left with importing the full underlying code with the hope of writing regex later to pull the names of the acts out.
+
+
+```{r message=FALSE, warning=FALSE}
+content <- ""
+for (n in 1:nrow(acts)) {
+  content[n] <- read_file(acts$directory[n]) %>%
+    paste(collapse = " ")
+}
+
+content <- tibble(content)
+
+acts_content <- bind_cols(acts, content)
+```
+
+
+Pulling the mentioned acts out of the content required a bit of regex. I tried and failed with many differed regex approaches. After reading through the code and finding how the acts are written, I eventually I settled on doing this in the following steps.
+
+1) Make all sorts of white space indicators a single white space. Note the use of `\\Q` at the start and `\\E` at the end of each pattern that needed to be replaced with a single whitespace. This makes the pattern literal instead of using the regex behaviour of the characters.
+2) Make all white space a single white space (incase the section above made multiple spaces)
+3) Remove appostrophes (official names of acts often include them but their file names do not)
+4) Extract the names of acts from the list of current acts (this limited the mentioned acts to current acts in South Australia - excluding federal acts that are often mentioned in state legislation)
+5) Unnesting the mentioned acts so that the tibble would be a nice edge list for doing graph work with.
+
+```{r message=FALSE, warning=FALSE}
+acts_prep <- acts_content %>%
+  mutate(content = str_replace_all(content, "\\Q%20\\E", " ")) %>%
+  mutate(content = str_replace_all(content, "\\Q\\'a0\\E", " ")) %>%
+  mutate(content = str_replace_all(content, "\\Q\r\n\\E", " ")) %>%
+  mutate(content = str_replace_all(content, "\\Q\n \n\\E", " ")) %>%
+  mutate(content = str_replace_all(content, "\\Q\n*|  \n*|\\E", " ")) %>%
+  mutate(content = str_replace_all(content, "\\s+", " ")) %>% 
+  mutate(content = str_replace_all(content, "'", ""))
+
+acts_mentions <- acts_prep %>%
+  mutate(to = str_extract_all(content, paste(as.character(from), collapse="|"))) %>%
+  select(from, to) %>%
+  unnest(to)
+
+```
+
+
+## Make the graph
+Full, confession: I acquired some `tidygraph` and `ggraph` hex-stickers at UseR2018. 
+
+
+<p align="center">
+![](/post/2018-11-01_files/laptop_stickers.JPG){width=30%}
+</p>
+
+
+But I haven't really put the packages to good use. So, this was an opportunity:
+
+```{r message=FALSE, warning=FALSE}
+acts_graph <- as_tbl_graph(acts_mentions, directed = FALSE) %>% 
+    mutate(community = as.factor(group_walktrap())) %>%
+  mutate(centrality = centrality_degree())
+
+ggraph(acts_graph, layout = 'graphopt', charge = .05) + 
+    geom_edge_link(alpha = .8) + 
+    geom_node_point(aes(colour = community, size = centrality), alpha = .3) + 
+  guides(colour = FALSE) + 
+    theme_graph() + 
+  labs(title = str_wrap("Hairball of active legislation with at least one edge (including loops) in South Australia November 2018", 50), caption = "Colour is the result of community detection")
+```
+
+Ok, that needs some work before it makes any sense. The most useful thing might be trimming off the least connected acts.
+
+```{r message=FALSE, warning=FALSE}
+ggraph(filter(acts_graph, centrality > 200), 
+       layout = 'igraph', 
+       algorithm = "nicely") + 
+    geom_edge_link(alpha = .05) + 
+    geom_node_point(aes(colour = community, size = centrality), alpha = .8) + 
+  guides(colour = FALSE) + 
+    theme_graph() + 
+  labs(title = str_wrap("(less of a) Hairball of active legislation in South Australia November 2018", 50), subtitle = "Of nodes with degree greater than two hundred (including loops)", caption = "Colour is the result of community detection")
+```
+
+
+This looks a bit more promising. There seem to be three majour clusters in the network. Lets have a look at the most connected acts in each of the clusters.
+
+
+```{r message=FALSE, warning=FALSE}
+acts_top <- acts_graph %>%
+  filter(centrality > 200) %>%
+  activate(nodes) %>%
+  as_tibble() %>%
+  filter(community %in% c(1, 2, 3)) %>%
+  group_by(community) %>%
+  top_n(6) %>%
+  ungroup()
+
+ggplot(data = acts_top, aes(x = fct_reorder(name, centrality), y = centrality, fill = community)) + 
+  geom_col() + 
+  facet_wrap(vars(community), nrow = 3, scales = "free") + 
+  coord_flip() + 
+  guides(fill = FALSE) + 
+  labs(title = str_wrap("Top ten most connected acts in the three largest communities", 40), subtitle = "Of nodes with degree greater than two hundred (including loops)", x = "Act name")
+  
+```
+
+
+So it seems that cluster 1 is related to administrative arrangements. Of the other two majour clusters, one (number 2) is  related to the management of the environment and the other (number 1) is related to the management of human services. So, this clustering makes a lot of sense.
+
+## Explore the metrics
+A decent place to start would be a histogram of the centrality of each act in the network.
+
+
+```{r message=FALSE, warning=FALSE}
+acts_metrics <- acts_graph %>%
+  activate(nodes) %>%
+  as_tibble()
+
+ggplot(data = acts_metrics, aes(x = centrality)) + 
+  geom_histogram(binwidth = 10) + 
+  labs(title = str_wrap("Histogram of centrality of acts with at least one edge (including loops) in the network of legislation in South Australia, November 2018", 70))
+```
+
+So, there are way more acts with few connections than there are acts with many connections.
+
+Something that would be interesting to check would be the relationship between the centrality of the acts and the year the act was assented to by the Governor.
+
+```{r message=FALSE, warning=FALSE}
+acts_metrics <- acts_metrics %>%
+  mutate(year = str_sub(name, -4, -1)) %>%
+  mutate(year = as.numeric(year))
+
+ggplot(data = acts_metrics, aes(x = year, y = centrality, colour = community)) + 
+  geom_point() +
+  scale_y_log10() + 
+  geom_text_repel(data = subset(acts_metrics, centrality > 1500), 
+                  aes(label = name, colour = community)) + 
+  guides(colour = FALSE) + 
+  labs(y = "centrality (log10)")
+```
+
+While its clear that there is more recent legislation is operation than older legislation, its not entirely clear if there is a relationship between centrality and longevity of an act.
+
+One other thing really stuck out is the line of acts that seem to be preserved in the current legislation that were all assented to in 1936.
+
+
+```{r message=FALSE, warning=FALSE}
+what_a_year <- acts_metrics %>%
+  filter(year == 1936) %>% 
+  select(name)
+
+kable(what_a_year)
+```
+What happened in 1936 or what is it about these acts that has meant they have endured?
+
+## The reading list
+Here is is, select the act you are primarily interested in and get the names of the other acts that are mentioned in it and that you will need to read as well.
+
+
+<iframe src="https://ofchurches.shinyapps.io/leg_reading_list_app/" width="100%" height="500"></iframe>
+
+
+## Make an interactive plot
+
+So, the last thing I wanted to do was make an interactive, zoom-able, clickable network of the legislation. Serendipitously, I had just been introduced to the wonderful `networkD3` package via Twitter from some amazing network researchers at Adelaide University:
+
+
+```{r echo = FALSE, fig.align="center"}
+blogdown::shortcode("tweet", "1060706080374763520")
+```
+
+
+This works better as a stand alone `shiny` app which you can access [**here**](https://ofchurches.shinyapps.io/leg_app/). You can drag and zoom it and select the name of a piece of legislation to see its place in the network.

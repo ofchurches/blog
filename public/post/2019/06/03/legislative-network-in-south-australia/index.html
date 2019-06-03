@@ -33,7 +33,249 @@
 
 
 
+<div id="background" class="section level1">
+<h1>Background</h1>
+<p>I joined the public service in 2017. Pretty soon after I started my boss and new colleagues suggested that the most important thing for me to read would be the legislation that I work under<a href="#fn1" class="footnoteRef" id="fnref1"><sup>1</sup></a>.</p>
+<p>The thing is, when reading my legislation, I realised that it referenced several other pieces of legislation. This meant that to fully understand my legislation I also had to read these referenced pieces of legislation. But guess what? All these pieces of legislation also referenced other pieces of legislation. And of course this meant that there could be other pieces of legislation that mentioned my piece of legislation.</p>
+<p>I realised that this could go on for quite some time!</p>
+<p>Also, I realised that this situation really suits a graph solution. In this sense:</p>
+<ul>
+<li>acts are nodes</li>
+<li>mentions of acts are links</li>
+</ul>
+<p>My plan was:</p>
+<ol style="list-style-type: decimal">
+<li>Download all the legislation active in South Australia at the moment</li>
+<li>Make a list of all the legislation</li>
+<li>Look for mentions of other acts within each act and make an edge list</li>
+<li>Make the graph</li>
+<li>Explore the network metrics</li>
+<li>Make an app that would suggest a ‘reading list’ of acts associated with a chosen act</li>
+<li>Make an interactive plot of the whole thing because pictures of graphs are pretty and informative</li>
+</ol>
+</div>
+<div id="so-to-work" class="section level1">
+<h1>So, to work…</h1>
+<div id="downloading-the-legislation" class="section level2">
+<h2>Downloading the legislation</h2>
+<p>This was easier than I thought. South Australia is super progressive with its use of open data and there is a copy of all legislation <a href="https://data.sa.gov.au/data/dataset/legislative-database">currently in use</a>. Impressively, this is updated every two weeks<a href="#fn2" class="footnoteRef" id="fnref2"><sup>2</sup></a></p>
+</div>
+<div id="a-list-of-legislation" class="section level2">
+<h2>A list of legislation</h2>
+<p>The current legislation is in a folder called “A” (for “Acts”).</p>
+<pre class="r"><code>library(here)
+library(tidyverse)
+library(tidygraph)
+library(igraph)
+library(ggraph)
+library(ggrepel)
+library(knitr)
+library(networkD3)
+library(readr)
 
+acts &lt;- list.files(path = here(&quot;static&quot;, &quot;A&quot;)) %&gt;%
+  tibble() %&gt;%
+  rename(&quot;from&quot; = &quot;.&quot;) %&gt;%
+  mutate(directory = list.files(path = here(&quot;static&quot;, &quot;A&quot;), 
+                                full.names = TRUE, 
+                                recursive = TRUE, 
+                                pattern = &quot;rtf$&quot;))</code></pre>
+</div>
+<div id="look-for-mentions" class="section level2">
+<h2>Look for mentions</h2>
+<p>This was a challenge. The biggest challenge was dealing with <em>rich text format!</em>.</p>
+<p>For some inexplicable reason the content of the acts is stored in rich text format. The <code>striprtf::read_rtf</code> function looked promising but I discovered that the names of the acts are <em>sometimes</em> hyperlinked to the website for that act. And because of this, the whole name of the act is <em>sometimes</em> removed from the document when its imported. Take these examples from my own act:</p>
+<blockquote>
+<p>“under the Equal Opportunity Act 1984 and, conversely”</p>
+<p>—This is how a phrase citing another act renders in the <a href="https://www.legislation.sa.gov.au/LZ/C/A/CHILDREN%20AND%20YOUNG%20PEOPLE%20(OVERSIGHT%20AND%20ADVOCACY%20BODIES)%20ACT%202016/CURRENT/2016.48.AUTH.PDF">pdf</a> of my act.</p>
+</blockquote>
+<blockquote>
+<p>“under the and, conversely”</p>
+<p>—This is how it is imported by <code>read_rtf</code>. The name of the act has disapeared because the name of the act is buried in code that <code>read_rtf</code> helpfully removes!</p>
+</blockquote>
+<p>So, I was left with importing the full underlying code with the hope of writing regex later to pull the names of the acts out.</p>
+<pre class="r"><code>content &lt;- &quot;&quot;
+for (n in 1:nrow(acts)) {
+  content[n] &lt;- read_file(acts$directory[n]) %&gt;%
+    paste(collapse = &quot; &quot;)
+}
+
+content &lt;- tibble(content)
+
+acts_content &lt;- bind_cols(acts, content)</code></pre>
+<p>Pulling the mentioned acts out of the content required a bit of regex. I tried and failed with many differed regex approaches. After reading through the code and finding how the acts are written, I eventually I settled on doing this in the following steps.</p>
+<ol style="list-style-type: decimal">
+<li>Make all sorts of white space indicators a single white space. Note the use of <code>\\Q</code> at the start and <code>\\E</code> at the end of each pattern that needed to be replaced with a single whitespace. This makes the pattern literal instead of using the regex behaviour of the characters.</li>
+<li>Make all white space a single white space (incase the section above made multiple spaces)</li>
+<li>Remove appostrophes (official names of acts often include them but their file names do not)</li>
+<li>Extract the names of acts from the list of current acts (this limited the mentioned acts to current acts in South Australia - excluding federal acts that are often mentioned in state legislation)</li>
+<li>Unnesting the mentioned acts so that the tibble would be a nice edge list for doing graph work with.</li>
+</ol>
+<pre class="r"><code>acts_prep &lt;- acts_content %&gt;%
+  mutate(content = str_replace_all(content, &quot;\\Q%20\\E&quot;, &quot; &quot;)) %&gt;%
+  mutate(content = str_replace_all(content, &quot;\\Q\\&#39;a0\\E&quot;, &quot; &quot;)) %&gt;%
+  mutate(content = str_replace_all(content, &quot;\\Q\r\n\\E&quot;, &quot; &quot;)) %&gt;%
+  mutate(content = str_replace_all(content, &quot;\\Q\n \n\\E&quot;, &quot; &quot;)) %&gt;%
+  mutate(content = str_replace_all(content, &quot;\\Q\n*|  \n*|\\E&quot;, &quot; &quot;)) %&gt;%
+  mutate(content = str_replace_all(content, &quot;\\s+&quot;, &quot; &quot;)) %&gt;% 
+  mutate(content = str_replace_all(content, &quot;&#39;&quot;, &quot;&quot;))
+
+acts_mentions &lt;- acts_prep %&gt;%
+  mutate(to = str_extract_all(content, paste(as.character(from), collapse=&quot;|&quot;))) %&gt;%
+  select(from, to) %&gt;%
+  unnest(to)</code></pre>
+</div>
+<div id="make-the-graph" class="section level2">
+<h2>Make the graph</h2>
+<p>Full, confession: I acquired some <code>tidygraph</code> and <code>ggraph</code> hex-stickers at UseR2018.</p>
+<p align="center">
+<img src="/post/2018-11-01_files/laptop_stickers.JPG" style="width:30.0%" />
+</p>
+<p>But I haven’t really put the packages to good use. So, this was an opportunity:</p>
+<pre class="r"><code>acts_graph &lt;- as_tbl_graph(acts_mentions, directed = FALSE) %&gt;% 
+    mutate(community = as.factor(group_walktrap())) %&gt;%
+  mutate(centrality = centrality_degree())
+
+ggraph(acts_graph, layout = &#39;graphopt&#39;, charge = .05) + 
+    geom_edge_link(alpha = .8) + 
+    geom_node_point(aes(colour = community, size = centrality), alpha = .3) + 
+  guides(colour = FALSE) + 
+    theme_graph() + 
+  labs(title = str_wrap(&quot;Hairball of active legislation with at least one edge (including loops) in South Australia November 2018&quot;, 50), caption = &quot;Colour is the result of community detection&quot;)</code></pre>
+<p><img src="/post/2019-06-03-legislative-network-in-south-australia_files/figure-html/unnamed-chunk-4-1.png" width="672" /></p>
+<p>Ok, that needs some work before it makes any sense. The most useful thing might be trimming off the least connected acts.</p>
+<pre class="r"><code>ggraph(filter(acts_graph, centrality &gt; 200), 
+       layout = &#39;igraph&#39;, 
+       algorithm = &quot;nicely&quot;) + 
+    geom_edge_link(alpha = .05) + 
+    geom_node_point(aes(colour = community, size = centrality), alpha = .8) + 
+  guides(colour = FALSE) + 
+    theme_graph() + 
+  labs(title = str_wrap(&quot;(less of a) Hairball of active legislation in South Australia November 2018&quot;, 50), subtitle = &quot;Of nodes with degree greater than two hundred (including loops)&quot;, caption = &quot;Colour is the result of community detection&quot;)</code></pre>
+<p><img src="/post/2019-06-03-legislative-network-in-south-australia_files/figure-html/unnamed-chunk-5-1.png" width="672" /></p>
+<p>This looks a bit more promising. There seem to be three majour clusters in the network. Lets have a look at the most connected acts in each of the clusters.</p>
+<pre class="r"><code>acts_top &lt;- acts_graph %&gt;%
+  filter(centrality &gt; 200) %&gt;%
+  activate(nodes) %&gt;%
+  as_tibble() %&gt;%
+  filter(community %in% c(1, 2, 3)) %&gt;%
+  group_by(community) %&gt;%
+  top_n(6) %&gt;%
+  ungroup()
+
+ggplot(data = acts_top, aes(x = fct_reorder(name, centrality), y = centrality, fill = community)) + 
+  geom_col() + 
+  facet_wrap(vars(community), nrow = 3, scales = &quot;free&quot;) + 
+  coord_flip() + 
+  guides(fill = FALSE) + 
+  labs(title = str_wrap(&quot;Top ten most connected acts in the three largest communities&quot;, 40), subtitle = &quot;Of nodes with degree greater than two hundred (including loops)&quot;, x = &quot;Act name&quot;)</code></pre>
+<p><img src="/post/2019-06-03-legislative-network-in-south-australia_files/figure-html/unnamed-chunk-6-1.png" width="672" /></p>
+<p>So it seems that cluster 1 is related to administrative arrangements. Of the other two majour clusters, one (number 2) is related to the management of the environment and the other (number 1) is related to the management of human services. So, this clustering makes a lot of sense.</p>
+</div>
+<div id="explore-the-metrics" class="section level2">
+<h2>Explore the metrics</h2>
+<p>A decent place to start would be a histogram of the centrality of each act in the network.</p>
+<pre class="r"><code>acts_metrics &lt;- acts_graph %&gt;%
+  activate(nodes) %&gt;%
+  as_tibble()
+
+ggplot(data = acts_metrics, aes(x = centrality)) + 
+  geom_histogram(binwidth = 10) + 
+  labs(title = str_wrap(&quot;Histogram of centrality of acts with at least one edge (including loops) in the network of legislation in South Australia, November 2018&quot;, 70))</code></pre>
+<p><img src="/post/2019-06-03-legislative-network-in-south-australia_files/figure-html/unnamed-chunk-7-1.png" width="672" /></p>
+<p>So, there are way more acts with few connections than there are acts with many connections.</p>
+<p>Something that would be interesting to check would be the relationship between the centrality of the acts and the year the act was assented to by the Governor.</p>
+<pre class="r"><code>acts_metrics &lt;- acts_metrics %&gt;%
+  mutate(year = str_sub(name, -4, -1)) %&gt;%
+  mutate(year = as.numeric(year))
+
+ggplot(data = acts_metrics, aes(x = year, y = centrality, colour = community)) + 
+  geom_point() +
+  scale_y_log10() + 
+  geom_text_repel(data = subset(acts_metrics, centrality &gt; 1500), 
+                  aes(label = name, colour = community)) + 
+  guides(colour = FALSE) + 
+  labs(y = &quot;centrality (log10)&quot;)</code></pre>
+<p><img src="/post/2019-06-03-legislative-network-in-south-australia_files/figure-html/unnamed-chunk-8-1.png" width="672" /></p>
+<p>While its clear that there is more recent legislation is operation than older legislation, its not entirely clear if there is a relationship between centrality and longevity of an act.</p>
+<p>One other thing really stuck out is the line of acts that seem to be preserved in the current legislation that were all assented to in 1936.</p>
+<pre class="r"><code>what_a_year &lt;- acts_metrics %&gt;%
+  filter(year == 1936) %&gt;% 
+  select(name)
+
+kable(what_a_year)</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th align="left">name</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">Civil Liability Act 1936</td>
+</tr>
+<tr class="even">
+<td align="left">Debtors Act 1936</td>
+</tr>
+<tr class="odd">
+<td align="left">Explosives Act 1936</td>
+</tr>
+<tr class="even">
+<td align="left">Land Tax Act 1936</td>
+</tr>
+<tr class="odd">
+<td align="left">Landlord and Tenant Act 1936</td>
+</tr>
+<tr class="even">
+<td align="left">Law of Property Act 1936</td>
+</tr>
+<tr class="odd">
+<td align="left">Limitation of Actions Act 1936</td>
+</tr>
+<tr class="even">
+<td align="left">Lottery and Gaming Act 1936</td>
+</tr>
+<tr class="odd">
+<td align="left">Mercantile Law Act 1936</td>
+</tr>
+<tr class="even">
+<td align="left">Oaths Act 1936</td>
+</tr>
+<tr class="odd">
+<td align="left">Redundant Officers Fund Act 1936</td>
+</tr>
+<tr class="even">
+<td align="left">Trustee Act 1936</td>
+</tr>
+<tr class="odd">
+<td align="left">Wills Act 1936</td>
+</tr>
+</tbody>
+</table>
+<p>What happened in 1936 or what is it about these acts that has meant they have endured?</p>
+</div>
+<div id="the-reading-list" class="section level2">
+<h2>The reading list</h2>
+<p>Here is is, select the act you are primarily interested in and get the names of the other acts that are mentioned in it and that you will need to read as well.</p>
+<iframe src="https://ofchurches.shinyapps.io/leg_reading_list_app/" width="100%" height="500">
+</iframe>
+</div>
+<div id="make-an-interactive-plot" class="section level2">
+<h2>Make an interactive plot</h2>
+<p>So, the last thing I wanted to do was make an interactive, zoom-able, clickable network of the legislation. Serendipitously, I had just been introduced to the wonderful <code>networkD3</code> package via Twitter from some amazing network researchers at Adelaide University:</p>
+<blockquote class="twitter-tweet"><p lang="en" dir="ltr">I used <a href="https://twitter.com/ChrisGandrud?ref_src=twsrc%5Etfw">@ChrisGandrud</a>&#39;s networkD3 package which can convert from an igraph object :) <br>I agree, the animation is very satisfying!</p>&mdash; Michelle Edwards (@maths_michelle) <a href="https://twitter.com/maths_michelle/status/1060706080374763520?ref_src=twsrc%5Etfw">November 9, 2018</a></blockquote>
+<script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
+
+<p>This works better as a stand alone <code>shiny</code> app which you can access <a href="https://ofchurches.shinyapps.io/leg_app/"><strong>here</strong></a>. You can drag and zoom it and select the name of a piece of legislation to see its place in the network.</p>
+</div>
+</div>
+<div class="footnotes">
+<hr />
+<ol>
+<li id="fn1"><p>Which happens to be the <a href="https://www.legislation.sa.gov.au/LZ/C/A/CHILDREN%20AND%20YOUNG%20PEOPLE%20(OVERSIGHT%20AND%20ADVOCACY%20BODIES)%20ACT%202016.aspx">Children and Young People (Oversight and Advocacy Bodies) Act 2016</a><a href="#fnref1">↩</a></p></li>
+<li id="fn2"><p>And the previous updates are stored giving a snapshot of legislation active every two week. This raises the possibility of looking at the way legislation has evolved.<a href="#fnref2">↩</a></p></li>
+</ol>
+</div>
 
 </main>
 
