@@ -128,7 +128,7 @@ Full, confession: I acquired some `tidygraph` and `ggraph` hex-stickers at UseR2
 </p>
 
 
-But I haven't really put the packages to good use. So, this was an opportunity.
+But I haven't really put the packages to good use. So, this was an opportunity:
 
 ```{r message=FALSE, warning=FALSE}
 acts_graph <- as_tbl_graph(acts_mentions, directed = FALSE) %>% 
