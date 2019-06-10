@@ -1,0 +1,214 @@
+---
+title: Statistical history hour
+author: ''
+date: '2019-06-06'
+slug: statistical-history-hour
+categories: []
+tags:
+  - history
+  - networks
+---
+
+<script src="/rmarkdown-libs/htmlwidgets/htmlwidgets.js"></script>
+<script src="/rmarkdown-libs/jquery/jquery.min.js"></script>
+<link href="/rmarkdown-libs/leaflet/leaflet.css" rel="stylesheet" />
+<script src="/rmarkdown-libs/leaflet/leaflet.js"></script>
+<link href="/rmarkdown-libs/leafletfix/leafletfix.css" rel="stylesheet" />
+<script src="/rmarkdown-libs/Proj4Leaflet/proj4-compressed.js"></script>
+<script src="/rmarkdown-libs/Proj4Leaflet/proj4leaflet.js"></script>
+<link href="/rmarkdown-libs/rstudio_leaflet/rstudio_leaflet.css" rel="stylesheet" />
+<script src="/rmarkdown-libs/leaflet-binding/leaflet.js"></script>
+<script src="/rmarkdown-libs/leaflet-providers/leaflet-providers.js"></script>
+<script src="/rmarkdown-libs/leaflet-providers-plugin/leaflet-providers-plugin.js"></script>
+<link href="/rmarkdown-libs/leaflet-markercluster/MarkerCluster.css" rel="stylesheet" />
+<link href="/rmarkdown-libs/leaflet-markercluster/MarkerCluster.Default.css" rel="stylesheet" />
+<script src="/rmarkdown-libs/leaflet-markercluster/leaflet.markercluster.js"></script>
+<script src="/rmarkdown-libs/leaflet-markercluster/leaflet.markercluster.freezable.js"></script>
+<script src="/rmarkdown-libs/leaflet-markercluster/leaflet.markercluster.layersupport.js"></script>
+
+
+<p>A delightful side product of my Churchill fellowship in 2019 was the opportunity to visit a bunch of places in the United Kingdom that are important for various moments in statistical history. During the trip I tweeted some gratuitous selfies at some of these locations. So, this is a blog post to:</p>
+<ol style="list-style-type: decimal">
+<li>Bring together the pictures and stories of those locations</li>
+<li>Extend the idea of visiting statistically <em>significant</em> locations as a tour using the <code>TSP</code> package to solve the problem of visiting these locations in the most efficient order.</li>
+</ol>
+<div id="my-own-tour" class="section level1">
+<h1>My own tour</h1>
+<p>To bring together a map of the places I had visited I thought it would be useful to plot them on a <code>leaflet</code> map.</p>
+<p>To do this I loaded the packages</p>
+<pre class="r"><code>library(tidyverse)
+library(leaflet)
+library(leafpop)
+library(knitr)
+library(ggmap)
+library(geosphere)
+library(TSP)</code></pre>
+<p>It turns out that <code>leaflet::popup</code> can show images with a url path so I used the pictures I had tweeted during my trip.</p>
+<p>So, I set up the <code>tibble</code> with the relevant data.</p>
+<pre class="r"><code>path &lt;- c(&quot;https://pbs.twimg.com/media/D6nDYPvXoAAenrA.jpg&quot;, 
+          &quot;https://pbs.twimg.com/media/D6O-1uUW0AEbB0d.jpg&quot;, 
+          &quot;https://pbs.twimg.com/media/D6hzcDnXsAE1Nzx.jpg&quot;, 
+          &quot;https://pbs.twimg.com/media/D43VCbKWAAAHj_o.jpg&quot;, 
+          &quot;https://pbs.twimg.com/media/D3nEZMnXkAEp-YT.jpg&quot;, 
+          &quot;https://pbs.twimg.com/media/D32oTTpWwAISgWU.jpg&quot;, 
+          &quot;https://pbs.twimg.com/media/D4A78tQWkAAEusF.jpg&quot;)
+label &lt;- c(&quot;St. Peters Cathedral, Adelaide&quot; ,
+           &quot;Bletchley Park&quot;, 
+           &quot;Gonville &amp; Caius College&quot;, 
+           &quot;Broad Street Pump&quot;, 
+           &quot;St Thomas&#39; Hospital&quot;, 
+           &quot;Bunhill Fields Burial Ground&quot;, 
+           &quot;Drapers Hall&quot;)
+details &lt;- c(&quot;R. A. Fisher is intered here&quot;, 
+             &quot;Edward Simpson and Bill Tutte (statue pictured) worked here as code breakers&quot;, 
+             &quot;This was R. A. Fisher&#39;s College&quot;, 
+             &quot;John Snow Snow pioneered the use of dot density maps to trace the source of cholera in Soho in 1854 to this water pump&quot;, 
+             &quot;Florence Nightingale built an evidenced based nursing school here. There is now a museum about her work where you can buy prints of her pioneering data visualisations&quot;, 
+             &quot;Thomas Bayes is burried here&quot;, 
+             &quot;John Graunt was one of the inventors of life tables and attempted to develop a predictive algorithm for plague in London and he was a trained haberdasher in this guild&quot;)
+lat &lt;- c(-34.912673, 
+         51.997713, 
+         52.205976, 
+         51.513298,
+         51.500151, 
+         51.523759, 
+         51.515368)
+lng &lt;- c(138.598089, 
+         -0.740643, 
+         0.117977, 
+         -0.136765, 
+         -0.117600, 
+         -0.088755, 
+         -0.086601)
+
+stat_hist &lt;- tibble(path, label, details, lat, lng)</code></pre>
+<p>And plotted the outcome.</p>
+<pre class="r"><code>    leaflet() %&gt;%
+      addProviderTiles(providers$Esri.WorldStreetMap,
+                       options = providerTileOptions(noWrap = FALSE)
+      ) %&gt;%
+      addMarkers(lat = stat_hist$lat, lng = stat_hist$lng, 
+                 popup = paste(sep = &quot;&lt;br/&gt;&quot;,
+                               paste0(&quot;&lt;img src=&#39;&quot;, stat_hist$path,  &quot;&#39;, width = 100/&gt;&quot;),
+                               paste0(stat_hist$details)
+                               ),
+                 clusterOptions = markerClusterOptions(),
+                 label = stat_hist$label
+                 )</code></pre>
+<div id="htmlwidget-1" style="width:672px;height:480px;" class="leaflet html-widget"></div>
+<script type="application/json" data-for="htmlwidget-1">{"x":{"options":{"crs":{"crsClass":"L.CRS.EPSG3857","code":null,"proj4def":null,"projectedBounds":null,"options":{}}},"calls":[{"method":"addProviderTiles","args":["Esri.WorldStreetMap",null,null,{"errorTileUrl":"","noWrap":false,"detectRetina":false}]},{"method":"addMarkers","args":[[-34.912673,51.997713,52.205976,51.513298,51.500151,51.523759,51.515368],[138.598089,-0.740643,0.117977,-0.136765,-0.1176,-0.088755,-0.086601],null,null,null,{"interactive":true,"draggable":false,"keyboard":true,"title":"","alt":"","zIndexOffset":0,"opacity":1,"riseOnHover":false,"riseOffset":250},["<img src='https://pbs.twimg.com/media/D6nDYPvXoAAenrA.jpg', width = 100/><br/>R. A. Fisher is intered here","<img src='https://pbs.twimg.com/media/D6O-1uUW0AEbB0d.jpg', width = 100/><br/>Edward Simpson and Bill Tutte (statue pictured) worked here as code breakers","<img src='https://pbs.twimg.com/media/D6hzcDnXsAE1Nzx.jpg', width = 100/><br/>This was R. A. Fisher's College","<img src='https://pbs.twimg.com/media/D43VCbKWAAAHj_o.jpg', width = 100/><br/>John Snow Snow pioneered the use of dot density maps to trace the source of cholera in Soho in 1854 to this water pump","<img src='https://pbs.twimg.com/media/D3nEZMnXkAEp-YT.jpg', width = 100/><br/>Florence Nightingale built an evidenced based nursing school here. There is now a museum about her work where you can buy prints of her pioneering data visualisations","<img src='https://pbs.twimg.com/media/D32oTTpWwAISgWU.jpg', width = 100/><br/>Thomas Bayes is burried here","<img src='https://pbs.twimg.com/media/D4A78tQWkAAEusF.jpg', width = 100/><br/>John Graunt was one of the inventors of life tables and attempted to develop a predictive algorithm for plague in London and he was a trained haberdasher in this guild"],null,{"showCoverageOnHover":true,"zoomToBoundsOnClick":true,"spiderfyOnMaxZoom":true,"removeOutsideVisibleBounds":true,"spiderLegPolylineOptions":{"weight":1.5,"color":"#222","opacity":0.5},"freezeAtZoom":false},null,["St. Peters Cathedral, Adelaide","Bletchley Park","Gonville &amp; Caius College","Broad Street Pump","St Thomas' Hospital","Bunhill Fields Burial Ground","Drapers Hall"],{"interactive":false,"permanent":false,"direction":"auto","opacity":1,"offset":[0,0],"textsize":"10px","textOnly":false,"className":"","sticky":true},null]}],"limits":{"lat":[-34.912673,52.205976],"lng":[-0.740643,138.598089]}},"evals":[],"jsHooks":[]}</script>
+</div>
+<div id="a-bigger-better-tour" class="section level1">
+<h1>A bigger, better tour</h1>
+<p>So if that looks like fun, how about a tour company in which we took people around the world visiting sites of statistical historical importance? This was the topic of a great conversation with <a href="https://twitter.com/alexwhan?lang=en">Alex Whan</a> at UseR2018.</p>
+<p>To set this up I needed:</p>
+<ol style="list-style-type: decimal">
+<li>A list of places statistical history tourists would really like to visit</li>
+<li>A way to determine the most efficient path to visit them all</li>
+</ol>
+<p>So, the places I think that should go on the tour are</p>
+<pre class="r"><code>label &lt;- c(&quot;Guinness Storehouse&quot;, 
+           &quot;Kaliningrad&quot;, 
+           &quot;Rothamsted Experimental Station&quot;, 
+           &quot;Broad Street Pump&quot;, 
+           &quot;Selimiye Barracks&quot;)
+details &lt;- c(&quot;Where William Gosset invested the t-test&quot;, 
+             &quot;Where Leonhard Euler invented graph theory (when the city was known as Königsberg)&quot;, 
+             &quot;Where Muriel Bristol drank a lot of tea to help advance experimental statistics&quot;, 
+             &quot;Where John Snow Snow pioneered the use of dot density maps to trace the source of cholera in Soho in 1854&quot;, 
+             &quot;Where Florence Nightingale developed evidence based hospitals&quot;)
+lat &lt;- c(53.341976, 
+         54.705578, 
+         51.809399, 
+         51.513298,
+         41.006698)
+lng &lt;- c(-6.286666, 
+         20.506606, 
+         0.354829, 
+         -0.136663, 
+         29.015474)
+stat_tour &lt;- tibble(label, details, lat, lng)
+
+kable(stat_tour)</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th align="left">label</th>
+<th align="left">details</th>
+<th align="right">lat</th>
+<th align="right">lng</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">Guinness Storehouse</td>
+<td align="left">Where William Gosset invested the t-test</td>
+<td align="right">53.34198</td>
+<td align="right">-6.286666</td>
+</tr>
+<tr class="even">
+<td align="left">Kaliningrad</td>
+<td align="left">Where Leonhard Euler invented graph theory (when the city was known as Königsberg)</td>
+<td align="right">54.70558</td>
+<td align="right">20.506606</td>
+</tr>
+<tr class="odd">
+<td align="left">Rothamsted Experimental Station</td>
+<td align="left">Where Muriel Bristol drank a lot of tea to help advance experimental statistics</td>
+<td align="right">51.80940</td>
+<td align="right">0.354829</td>
+</tr>
+<tr class="even">
+<td align="left">Broad Street Pump</td>
+<td align="left">Where John Snow Snow pioneered the use of dot density maps to trace the source of cholera in Soho in 1854</td>
+<td align="right">51.51330</td>
+<td align="right">-0.136663</td>
+</tr>
+<tr class="odd">
+<td align="left">Selimiye Barracks</td>
+<td align="left">Where Florence Nightingale developed evidence based hospitals</td>
+<td align="right">41.00670</td>
+<td align="right">29.015474</td>
+</tr>
+</tbody>
+</table>
+<p>And we can plot them on their own map.</p>
+<pre class="r"><code>stat_tour_map &lt;- leaflet() %&gt;%
+      addProviderTiles(providers$Esri.WorldStreetMap,
+                       options = providerTileOptions(noWrap = FALSE)
+      ) %&gt;%
+      addMarkers(lat = stat_tour$lat, lng = stat_tour$lng, 
+                 popup = paste(sep = &quot;&lt;br/&gt;&quot;,
+                               paste0(stat_tour$details)
+                               ),
+                 clusterOptions = markerClusterOptions(),
+                 label = stat_tour$label
+                 )
+
+stat_tour_map</code></pre>
+<div id="htmlwidget-2" style="width:672px;height:480px;" class="leaflet html-widget"></div>
+<script type="application/json" data-for="htmlwidget-2">{"x":{"options":{"crs":{"crsClass":"L.CRS.EPSG3857","code":null,"proj4def":null,"projectedBounds":null,"options":{}}},"calls":[{"method":"addProviderTiles","args":["Esri.WorldStreetMap",null,null,{"errorTileUrl":"","noWrap":false,"detectRetina":false}]},{"method":"addMarkers","args":[[53.341976,54.705578,51.809399,51.513298,41.006698],[-6.286666,20.506606,0.354829,-0.136663,29.015474],null,null,null,{"interactive":true,"draggable":false,"keyboard":true,"title":"","alt":"","zIndexOffset":0,"opacity":1,"riseOnHover":false,"riseOffset":250},["Where William Gosset invested the t-test","Where Leonhard Euler invented graph theory (when the city was known as Königsberg)","Where Muriel Bristol drank a lot of tea to help advance experimental statistics","Where John Snow Snow pioneered the use of dot density maps to trace the source of cholera in Soho in 1854","Where Florence Nightingale developed evidence based hospitals"],null,{"showCoverageOnHover":true,"zoomToBoundsOnClick":true,"spiderfyOnMaxZoom":true,"removeOutsideVisibleBounds":true,"spiderLegPolylineOptions":{"weight":1.5,"color":"#222","opacity":0.5},"freezeAtZoom":false},null,["Guinness Storehouse","Kaliningrad","Rothamsted Experimental Station","Broad Street Pump","Selimiye Barracks"],{"interactive":false,"permanent":false,"direction":"auto","opacity":1,"offset":[0,0],"textsize":"10px","textOnly":false,"className":"","sticky":true},null]}],"limits":{"lat":[41.006698,54.705578],"lng":[-6.286666,29.015474]}},"evals":[],"jsHooks":[]}</script>
+<p>But now the fun bit. We can plan a route! There are <code>nrow(stat_tour)</code> stops on the tour, so there are <code>factorial(nrow(stat_tour)))</code> possible orders in which to see all the stops. But some of those tours are prety long! If we want to shorten the tour down we can think of this traveling statistician problem as a <a href="https://en.wikipedia.org/wiki/Travelling_salesman_problem">traveling salesperson problem</a>. And there is an R package just for this purpose: <code>TSP</code>.</p>
+<p>Following the same solution used for finding an optimal route to visit <a href="http://www.randalolson.com/2016/07/30/the-optimal-u-s-national-parks-centennial-road-trip/">National Parks</a> in the USA and beer gardens in <a href="http://blog.schochastics.net/post/traveling-beerdrinker-problem/">Munich</a>, we can find the route thus:</p>
+<pre class="r"><code>n &lt;- nrow(stat_tour)
+tour_dist &lt;- matrix(0,n,n)
+for(i in 1:n){
+  for(j in 1:n){
+    tour_dist[i,j] &lt;- geosphere::distGeo(c(stat_tour$lng[i],stat_tour$lat[i]),
+                                         c(stat_tour$lng[j],stat_tour$lat[j]))
+  }
+}
+
+tour_tsp &lt;- TSP(tour_dist, labels = stat_tour$label)
+tour_route &lt;- solve_TSP(tour_tsp, method = &quot;nn&quot;)</code></pre>
+<p>We can plot it as a cycle (so that we come back to where we started) on the map.</p>
+<pre class="r"><code>tour_cycle &lt;-  tour_route %&gt;%
+  as.integer() %&gt;%
+  c(tour_route,tour_route[1])
+
+stat_tour_map %&gt;%
+  addPolylines(data = stat_tour[tour_cycle, ], lat =~ lat,lng =~ lng)</code></pre>
+<div id="htmlwidget-3" style="width:672px;height:480px;" class="leaflet html-widget"></div>
+<script type="application/json" data-for="htmlwidget-3">{"x":{"options":{"crs":{"crsClass":"L.CRS.EPSG3857","code":null,"proj4def":null,"projectedBounds":null,"options":{}}},"calls":[{"method":"addProviderTiles","args":["Esri.WorldStreetMap",null,null,{"errorTileUrl":"","noWrap":false,"detectRetina":false}]},{"method":"addMarkers","args":[[53.341976,54.705578,51.809399,51.513298,41.006698],[-6.286666,20.506606,0.354829,-0.136663,29.015474],null,null,null,{"interactive":true,"draggable":false,"keyboard":true,"title":"","alt":"","zIndexOffset":0,"opacity":1,"riseOnHover":false,"riseOffset":250},["Where William Gosset invested the t-test","Where Leonhard Euler invented graph theory (when the city was known as Königsberg)","Where Muriel Bristol drank a lot of tea to help advance experimental statistics","Where John Snow Snow pioneered the use of dot density maps to trace the source of cholera in Soho in 1854","Where Florence Nightingale developed evidence based hospitals"],null,{"showCoverageOnHover":true,"zoomToBoundsOnClick":true,"spiderfyOnMaxZoom":true,"removeOutsideVisibleBounds":true,"spiderLegPolylineOptions":{"weight":1.5,"color":"#222","opacity":0.5},"freezeAtZoom":false},null,["Guinness Storehouse","Kaliningrad","Rothamsted Experimental Station","Broad Street Pump","Selimiye Barracks"],{"interactive":false,"permanent":false,"direction":"auto","opacity":1,"offset":[0,0],"textsize":"10px","textOnly":false,"className":"","sticky":true},null]},{"method":"addPolylines","args":[[[[{"lng":[-6.286666,-0.136663,0.354829,20.506606,29.015474,-6.286666,-0.136663,0.354829,20.506606,29.015474,-6.286666],"lat":[53.341976,51.513298,51.809399,54.705578,41.006698,53.341976,51.513298,51.809399,54.705578,41.006698,53.341976]}]]],null,null,{"interactive":true,"className":"","stroke":true,"color":"#03F","weight":5,"opacity":0.5,"fill":false,"fillColor":"#03F","fillOpacity":0.2,"smoothFactor":1,"noClip":false},null,null,null,{"interactive":false,"permanent":false,"direction":"auto","opacity":1,"offset":[0,0],"textsize":"10px","textOnly":false,"className":"","sticky":true},null]}],"limits":{"lat":[41.006698,54.705578],"lng":[-6.286666,29.015474]}},"evals":[],"jsHooks":[]}</script>
+<p>So there you have it. A 6.503748910^{6} km tour across Europe visiting places of statistical historical importance. If anyone in the tourism industry is interested in running this as a product, let <a href="https://twitter.com/OwenChurches?lang=en">me</a> know!</p>
+</div>

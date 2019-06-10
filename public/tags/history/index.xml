@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>history on Owen Churches&#39;s blog</title>
+    <link>/tags/history/</link>
+    <description>Recent content in history on Owen Churches&#39;s blog</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Thu, 06 Jun 2019 00:00:00 +0000</lastBuildDate>
+    
+	<atom:link href="/tags/history/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+    <item>
+      <title>Statistical history hour</title>
+      <link>/post/2019/06/06/statistical-history-hour/</link>
+      <pubDate>Thu, 06 Jun 2019 00:00:00 +0000</pubDate>
+      
+      <guid>/post/2019/06/06/statistical-history-hour/</guid>
+      <description>A delightful side product of my Churchill fellowship in 2019 was the opportunity to visit a bunch of places in the United Kingdom that are important for various moments in statistical history. During the trip I tweeted some gratuitous selfies at some of these locations. So, this is a blog post to:
+Bring together the pictures and stories of those locations Extend the idea of visiting statistically significant locations as a tour using the TSP package to solve the problem of visiting these locations in the most efficient order.</description>
+    </item>
+    
+  </channel>
+</rss>

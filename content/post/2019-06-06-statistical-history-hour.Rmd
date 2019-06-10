@@ -1,0 +1,177 @@
+---
+title: Statistical history hour
+author: ''
+date: '2019-06-06'
+slug: statistical-history-hour
+categories: []
+tags:
+  - history
+  - networks
+---
+
+A delightful side product of my Churchill fellowship in 2019 was the opportunity to visit a bunch of places in the United Kingdom that are important for various moments in statistical history. During the trip I tweeted some gratuitous selfies at some of these locations. So, this is a blog post to:
+
+1) Bring together the pictures and stories of those locations
+2) Extend the idea of visiting statistically *significant* locations as a tour using the `TSP` package to solve the problem of visiting these locations in the most efficient order.
+
+#My own tour
+To bring together a map of the places I had visited I thought it would be useful to plot them on a `leaflet` map.
+
+To do this I loaded the packages
+```{r  message=FALSE, warning=FALSE}
+library(tidyverse)
+library(leaflet)
+library(leafpop)
+library(knitr)
+library(ggmap)
+library(geosphere)
+library(TSP)
+```
+
+It turns out that `leaflet::popup` can show images with a url path so I used the pictures I had tweeted during my trip.
+
+So, I set up the `tibble` with the relevant data.
+```{r}
+path <- c("https://pbs.twimg.com/media/D6nDYPvXoAAenrA.jpg", 
+          "https://pbs.twimg.com/media/D6O-1uUW0AEbB0d.jpg", 
+          "https://pbs.twimg.com/media/D6hzcDnXsAE1Nzx.jpg", 
+          "https://pbs.twimg.com/media/D43VCbKWAAAHj_o.jpg", 
+          "https://pbs.twimg.com/media/D3nEZMnXkAEp-YT.jpg", 
+          "https://pbs.twimg.com/media/D32oTTpWwAISgWU.jpg", 
+          "https://pbs.twimg.com/media/D4A78tQWkAAEusF.jpg")
+label <- c("St. Peters Cathedral, Adelaide" ,
+           "Bletchley Park", 
+           "Gonville & Caius College", 
+           "Broad Street Pump", 
+           "St Thomas' Hospital", 
+           "Bunhill Fields Burial Ground", 
+           "Drapers Hall")
+details <- c("R. A. Fisher is intered here", 
+             "Edward Simpson and Bill Tutte (statue pictured) worked here as code breakers", 
+             "This was R. A. Fisher's College", 
+             "John Snow Snow pioneered the use of dot density maps to trace the source of cholera in Soho in 1854 to this water pump", 
+             "Florence Nightingale built an evidenced based nursing school here. There is now a museum about her work where you can buy prints of her pioneering data visualisations", 
+             "Thomas Bayes is burried here", 
+             "John Graunt was one of the inventors of life tables and attempted to develop a predictive algorithm for plague in London and he was a trained haberdasher in this guild")
+lat <- c(-34.912673, 
+         51.997713, 
+         52.205976, 
+         51.513298,
+         51.500151, 
+         51.523759, 
+         51.515368)
+lng <- c(138.598089, 
+         -0.740643, 
+         0.117977, 
+         -0.136765, 
+         -0.117600, 
+         -0.088755, 
+         -0.086601)
+
+stat_hist <- tibble(path, label, details, lat, lng)
+```
+
+And plotted the outcome.
+```{r}
+    leaflet() %>%
+      addProviderTiles(providers$Esri.WorldStreetMap,
+                       options = providerTileOptions(noWrap = FALSE)
+      ) %>%
+      addMarkers(lat = stat_hist$lat, lng = stat_hist$lng, 
+                 popup = paste(sep = "<br/>",
+                               paste0("<img src='", stat_hist$path,  "', width = 100/>"),
+                               paste0(stat_hist$details)
+                               ),
+                 clusterOptions = markerClusterOptions(),
+                 label = stat_hist$label
+                 )
+```
+
+#A bigger, better tour
+So if that looks like fun, how about a tour company in which we took people around the world visiting sites of statistical historical importance? This was the topic of a great conversation with [Alex Whan](https://twitter.com/alexwhan?lang=en) at UseR2018.
+
+To set this up I needed:
+
+1) A list of places statistical history tourists would really like to visit
+2) A way to determine the most efficient path to visit them all
+
+So, the places I think that should go on the tour are
+```{r}
+label <- c("Guinness Storehouse", 
+           "Kaliningrad", 
+           "Rothamsted Experimental Station", 
+           "Broad Street Pump", 
+           "Selimiye Barracks")
+details <- c("Where William Gosset invested the t-test", 
+             "Where Leonhard Euler invented graph theory (when the city was known as Königsberg)", 
+             "Where Muriel Bristol drank a lot of tea to help advance experimental statistics", 
+             "Where John Snow Snow pioneered the use of dot density maps to trace the source of cholera in Soho in 1854", 
+             "Where Florence Nightingale developed evidence based hospitals")
+lat <- c(53.341976, 
+         54.705578, 
+         51.809399, 
+         51.513298,
+         41.006698)
+lng <- c(-6.286666, 
+         20.506606, 
+         0.354829, 
+         -0.136663, 
+         29.015474)
+stat_tour <- tibble(label, details, lat, lng)
+
+kable(stat_tour)
+```
+
+And we can plot them on their own map.
+
+```{r}
+stat_tour_map <- leaflet() %>%
+      addProviderTiles(providers$Esri.WorldStreetMap,
+                       options = providerTileOptions(noWrap = FALSE)
+      ) %>%
+      addMarkers(lat = stat_tour$lat, lng = stat_tour$lng, 
+                 popup = paste(sep = "<br/>",
+                               paste0(stat_tour$details)
+                               ),
+                 clusterOptions = markerClusterOptions(),
+                 label = stat_tour$label
+                 )
+
+stat_tour_map
+```
+
+But now the fun bit. We can plan a route! There are `nrow(stat_tour)` stops on the tour, so there are `factorial(nrow(stat_tour)))` possible orders in which to see all the stops. But some of those tours are prety long! If we want to shorten the tour down we can think of this traveling statistician problem as a [traveling salesperson problem](https://en.wikipedia.org/wiki/Travelling_salesman_problem). And there is an R package just for this purpose: `TSP`.
+
+Following the same solution used for finding an optimal route to visit [National Parks](http://www.randalolson.com/2016/07/30/the-optimal-u-s-national-parks-centennial-road-trip/) in the USA and beer gardens in [Munich](http://blog.schochastics.net/post/traveling-beerdrinker-problem/), we can find the route thus:
+
+```{r}
+n <- nrow(stat_tour)
+tour_dist <- matrix(0,n,n)
+for(i in 1:n){
+  for(j in 1:n){
+    tour_dist[i,j] <- geosphere::distGeo(c(stat_tour$lng[i],stat_tour$lat[i]),
+                                         c(stat_tour$lng[j],stat_tour$lat[j]))
+  }
+}
+
+tour_tsp <- TSP(tour_dist, labels = stat_tour$label)
+tour_route <- solve_TSP(tour_tsp, method = "nn")
+
+```
+
+
+We can plot it as a cycle (so that we come back to where we started) on the map.
+
+
+```{r}
+tour_cycle <-  tour_route %>%
+  as.integer() %>%
+  c(tour_route,tour_route[1])
+
+stat_tour_map %>%
+  addPolylines(data = stat_tour[tour_cycle, ], lat =~ lat,lng =~ lng)
+```
+
+
+So there you have it. A `r tour_length(tour_route)` km tour across Europe visiting places of statistical historical importance. If anyone in the tourism industry is interested in running this as a product, let [me](https://twitter.com/OwenChurches?lang=en) know!
+
