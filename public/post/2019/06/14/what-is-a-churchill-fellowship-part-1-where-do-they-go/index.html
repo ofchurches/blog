@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>What is a Churchill Fellowship Part 1 - Where do they go? | Owen Churches&#39;s blog</title>
+    <link rel="stylesheet" href="/css/style.css" />
+    <link rel="stylesheet" href="/css/fonts.css" />
+    
+  </head>
+
+  <body>
+    <nav>
+    <ul class="menu">
+      
+      <li><a href="/">Home</a></li>
+      
+      <li><a href="/about/">About</a></li>
+      
+      <li><a href="/tags/">Tags</a></li>
+      
+    </ul>
+    <hr/>
+    </nav>
+
+<div class="article-meta">
+<h1><span class="title">What is a Churchill Fellowship Part 1 - Where do they go?</span></h1>
+
+<h2 class="date">2019/06/14</h2>
+</div>
+
+<main>
+
+
+
+<p>The <a href="https://www.churchilltrust.com.au/">Churchill Fellowship</a> presents an amazing opportunity for Australians to:</p>
+<blockquote>
+<p>Travel overseas for 4-8 weeks to investigate inspiring practices around a topic or issue you are passionate about! Use the new knowledge and experience you gain from experts and specialists from around the world to make a difference in Australia.</p>
+</blockquote>
+<p>I began thinking in earnest about applying for a fellowship in January 2018. But it was a bit overwhelming. I had so many questions. Chief amongst them where:</p>
+<ol style="list-style-type: decimal">
+<li>Where in the world <em>overseas</em> do fellows go?</li>
+<li>What <em>topics or issues</em> do fellows study</li>
+</ol>
+<p>But, as a statistician, I have a default pivot that I turn to that helps me deal with overwhelming stuff: I quantify it!</p>
+<p>Wonderfully, the Churchill Fellowship maintains a comprehensive list of every fellowship going back to <a href="https://www.churchilltrust.com.au/fellows/detail/45/Lois+WILKSCH%20%28Now%20Loffler%29">Lois Wilksch’s</a> fellowship in 1966 to the UK which set out:</p>
+<blockquote>
+<p>“To study and extend knowledge of infant teaching and educational developments, particularly children’s communication”</p>
+</blockquote>
+<p>This resource of past fellowships is a great place to start thinking about what you could do as a fellow yourself. And with a bit of help from the <code>rvest</code> package we can get lots of information out of these pages to help understand what previous fellows have done.</p>
+<p>So, this post is about my attempt to answer that first question: Where do fellows go?</p>
+<p>This goes in a few stages:</p>
+<ol style="list-style-type: decimal">
+<li>Get the data</li>
+<li>Clean the data</li>
+<li>Visualise the data</li>
+</ol>
+<p>First, load the packages</p>
+<pre class="r"><code>library(tidyverse)
+library(purrr)
+library(rvest)
+library(here)
+library(knitr)
+library(viridis)
+library(readr)
+library(broom)
+library(ggrepel)
+library(scales)
+library(UpSetR)</code></pre>
+<p>With an inspection of the Churchill Fellowship <a href="https://www.churchilltrust.com.au/fellows/">website</a> there are currently 218<a href="#fn1" class="footnoteRef" id="fnref1"><sup>1</sup></a> pages of felowship reports.</p>
+<p>So, based on <a href="https://stackoverflow.com/questions/36683510/r-web-scraping-across-multiple-pages">this</a> suggestion and the excellent <code>rvest</code> <a href="https://blog.rstudio.com/2014/11/24/rvest-easy-web-scraping-with-r/">tutorial</a> we can collect the data from each page.</p>
+<p>The chunk below would actually work in <code>blogdown</code>! Seriously, you can do the scraping in the blog itself. Using <code>rvest::html</code> and <code>purr:map_df</code> makes it pretty efficient. But, each time I <code>blogdown::serve_site</code> on this blog it will pull the first 218 pages from the website. So these analyses would change over time. One day the Churchill Trust website might even change. So, I’ve downloaded the data available today and stored it in the “static” folder of this website as a “.csv” so you can play with it too.</p>
+<pre class="r"><code>url_base &lt;- &quot;https://www.churchilltrust.com.au/fellows/?page=%d&quot;
+n_pages &lt;- 218
+
+churchill_scrape &lt;- map_df(1:n_pages, function(i) {
+  
+  page &lt;- read_html(sprintf(url_base, i))
+  
+  tibble(project = html_text(html_nodes(page, &quot;.year+ td&quot;)), 
+         year = html_text(html_nodes(page, &quot;.tbl-fellows .year&quot;)),
+         fellow = html_text(html_nodes(page, &quot;.name&quot;))
+         )
+  
+})
+
+kable(head(churchill_scrape))</code></pre>
+<p>A practical first question I had was “How many fellowships are given out each year?”. Well, now we can see:</p>
+<pre class="r"><code>churchill_scrape_saved &lt;- read_csv(here(&quot;static&quot;, &quot;churchill_scrape.csv&quot;))
+
+churchill_scrape_saved %&gt;%
+  count(year) %&gt;%
+  ggplot(aes(x = as.numeric(year), y = n)) +
+  geom_line() + 
+  labs(x = &quot;Year&quot;, y = &quot;Number of fellowships funded&quot;)</code></pre>
+<p><img src="/post/2019-06-14-what-is-a-churchill-fellowship-part-1-where-do-they-go_files/figure-html/unnamed-chunk-3-1.png" width="672" /></p>
+<p>So, that’s an interesting function. I guess the number of fellowships given out each year is the result of lots of different factors. Some of them will come and go abruptly. There could be a decision made by the trust to spend a lot more money such as in 2002 or not having as much from interest in the trust such as in 2009 and 2010.</p>
+<p>But back to the main question: where do they go?</p>
+<p>The <em>places</em> visited are part of the string contained in <code>churchill_scrape$project</code>. So, with a bit of regex I pulled the <em>places</em> out.</p>
+<pre class="r"><code>churchill_regions &lt;- churchill_scrape_saved %&gt;%
+  mutate(region = str_extract(project, &quot;(?&lt;= - )(.*)(?=\n)&quot;)) %&gt;%
+  mutate(region = str_split(region, &quot;,&quot;)) %&gt;%
+  unnest(region) %&gt;%
+  mutate(region = str_trim(region)) %&gt;%
+  mutate(region = str_replace_all(region, &quot;[.]&quot;, &quot;&quot;)) %&gt;%
+  filter(is.na(region) == FALSE)
+
+
+  kable(head(churchill_regions))</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th align="right">X1</th>
+<th align="left">project</th>
+<th align="right">year</th>
+<th align="left">fellow</th>
+<th align="left">region</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="right">1</td>
+<td align="left">To research access to primary health care for people in contact with the criminal justice system - USA, Canada</td>
+<td align="right">2018</td>
+<td align="left">Abbott, Penelope</td>
+<td align="left">USA</td>
+</tr>
+<tr class="even">
+<td align="right">1</td>
+<td align="left">To research access to primary health care for people in contact with the criminal justice system - USA, Canada</td>
+<td align="right">2018</td>
+<td align="left">Abbott, Penelope</td>
+<td align="left">Canada</td>
+</tr>
+<tr class="odd">
+<td align="right">2</td>
+<td align="left">To investigate the protection of Indigenous cultural rights in Panama and the United States - Panama, USA, Switzerland</td>
+<td align="right">2018</td>
+<td align="left">Adjei, Patricia</td>
+<td align="left">Panama</td>
+</tr>
+<tr class="even">
+<td align="right">2</td>
+<td align="left">To investigate the protection of Indigenous cultural rights in Panama and the United States - Panama, USA, Switzerland</td>
+<td align="right">2018</td>
+<td align="left">Adjei, Patricia</td>
+<td align="left">USA</td>
+</tr>
+<tr class="odd">
+<td align="right">2</td>
+<td align="left">To investigate the protection of Indigenous cultural rights in Panama and the United States - Panama, USA, Switzerland</td>
+<td align="right">2018</td>
+<td align="left">Adjei, Patricia</td>
+<td align="left">Switzerland</td>
+</tr>
+<tr class="even">
+<td align="right">3</td>
+<td align="left">The Dr Dorothea Sandars Churchill Fellowship to develop cutting edge oncofertility options for Australian females - USA</td>
+<td align="right">2018</td>
+<td align="left">Bertoldo, Michael</td>
+<td align="left">USA</td>
+</tr>
+</tbody>
+</table>
+<p>Now, let’s just hit pause on the “scrapy scrapy data data wooooo” process and take the time to remember two things.</p>
+<ol style="list-style-type: decimal">
+<li>Asking a question with data involves applying <em>definitions</em> which should be made explicit</li>
+<li>This is real data and so will contain errors</li>
+</ol>
+<p>Definitions are important because they allow us to agregate information systematically. But definitions also make value judgements. Definitions don’t come from the data, they are imposed on the data. They reflect our thinking about where the data came from and influence our thinking about the data after the analyses are done.</p>
+<p>In this case, the question “where do they go?” lends itself to be answered with a list of <em>countries</em>. But <em>country</em> is a notoriourly dificult construct to define. Labeling, or not labeling, a geographic region as a country carries great policial meaning. And, with a read through the Churchill website, it seems that that several fellows have visited <em>places</em> that under some definitions would be countries but under other definitions would not be.</p>
+<p>So, I decided to use a definition that was consistent with my original question. I wanted to see (visually) where fellows went. Since this was always going to end up being mapped I decided to manually change the <em>places</em> visited to be <em>regions</em> in the <code>maps::world</code> package.</p>
+<p>This also allowed me to take care of the errors. I built a <code>tibble</code> with the regions that were on the map and checked if the places in each fellowship were listed. If they weren’t then I manually changed them based on my best estiamte of where they actually visited.</p>
+<pre class="r"><code>map_regions &lt;- map_data(&quot;world&quot;) %&gt;%
+  select(region) %&gt;%
+  distinct()
+
+churchill_regions_map &lt;- churchill_regions %&gt;%
+  mutate(match = if_else(region %in% pull(map_regions, region), &quot;yes&quot;, &quot;no&quot;))</code></pre>
+<p>So then I reimported the manually corrected file.</p>
+<pre class="r"><code>churchill_regions_map_corrected &lt;- read_csv(here(&quot;static&quot;, &quot;churchill_regions_map_corrected.csv&quot;)) %&gt;%
+  filter(is.na(corrected) == FALSE)
+
+kable(head(churchill_regions_map_corrected))</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th align="left">project</th>
+<th align="right">year</th>
+<th align="left">fellow</th>
+<th align="left">region</th>
+<th align="left">match</th>
+<th align="left">corrected</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">To examine leading dispute resolution practices upon cross-cultural family breakdown - Singapore, Malaysia, Hong Kong, Japan, Canada</td>
+<td align="right">2017</td>
+<td align="left">Barr, Stuart</td>
+<td align="left">Hong Kong</td>
+<td align="left">no</td>
+<td align="left">China</td>
+</tr>
+<tr class="even">
+<td align="left">To investigate early intervention in mental illnesses for serving police and peer support for former police employees - USA, Canada, UK, Hong Kong</td>
+<td align="right">2017</td>
+<td align="left">Dean, Greg</td>
+<td align="left">Hong Kong</td>
+<td align="left">no</td>
+<td align="left">China</td>
+</tr>
+<tr class="odd">
+<td align="left">To research new, practical methods to fight law enforcement corruption by organised crime - Hong Kong, Austria, Lithuania, Estonia, Finland</td>
+<td align="right">2017</td>
+<td align="left">Nixon, Carolyn</td>
+<td align="left">Hong Kong</td>
+<td align="left">no</td>
+<td align="left">China</td>
+</tr>
+<tr class="even">
+<td align="left">The Mr and Mrs Gerald Frank New Churchill Fellowship to learn how to make 18th Century clarinets for Australian clarinettists - UK, The Netherlands</td>
+<td align="right">2016</td>
+<td align="left">Doyle, Andrew</td>
+<td align="left">The Netherlands</td>
+<td align="left">no</td>
+<td align="left">Netherlands</td>
+</tr>
+<tr class="odd">
+<td align="left">To research the effects of vehicle lane changing on freeway capacity and road safety - France, Norway, Sweden, Netherlands, Belgium, Germany, Italy, Greece and Israel.</td>
+<td align="right">2016</td>
+<td align="left">Gaffney, John</td>
+<td align="left">Greece and Israel</td>
+<td align="left">no</td>
+<td align="left">Greece</td>
+</tr>
+<tr class="even">
+<td align="left">To research the effects of vehicle lane changing on freeway capacity and road safety - France, Norway, Sweden, Netherlands, Belgium, Germany, Italy, Greece and Israel.</td>
+<td align="right">2016</td>
+<td align="left">Gaffney, John</td>
+<td align="left">Greece and Israel</td>
+<td align="left">no</td>
+<td align="left">Israel</td>
+</tr>
+</tbody>
+</table>
+<p>Which means that we can finally see which regions of the world are most visited by Churchill Fellows.</p>
+<pre class="r"><code>churchill_regions_map_corrected %&gt;%
+  count(corrected) %&gt;%
+  top_n(10) %&gt;%
+  ggplot(aes(x = reorder(corrected, n), y = n)) + 
+  geom_col() + 
+  labs(x = &quot;Places visited&quot;, y = &quot;Number of times visited&quot;, title = &quot;Most visited palces by Churchill fellows from 1966 to 2018&quot;) + 
+  coord_flip()</code></pre>
+<p><img src="/post/2019-06-14-what-is-a-churchill-fellowship-part-1-where-do-they-go_files/figure-html/unnamed-chunk-7-1.png" width="672" /></p>
+<p>So, North America and Europe really dominate the most visited regions. To see the extent of visits across the world it might make more sense to view the number of visits to each reagion on a map.</p>
+<pre class="r"><code>count_regions &lt;- churchill_regions_map_corrected %&gt;%
+  count(corrected)
+
+world_map &lt;- map_data(&quot;world&quot;) %&gt;%
+  left_join(count_regions, by = c(&quot;region&quot; = &quot;corrected&quot;))
+
+ggplot(world_map, aes(map_id = region, fill = n))+
+  geom_map(map = world_map,  color = &quot;white&quot;)+
+  expand_limits(x = world_map$long, y = world_map$lat)+
+  scale_fill_viridis_c(option = &quot;C&quot;, trans = &quot;log&quot;) + 
+  labs(fill = &quot;Number of visits (log)&quot;) + 
+  theme(axis.title.x=element_blank(), axis.title.y=element_blank())</code></pre>
+<p><img src="/post/2019-06-14-what-is-a-churchill-fellowship-part-1-where-do-they-go_files/figure-html/unnamed-chunk-8-1.png" width="672" /></p>
+<p>It really shows where Australians think they can go to learn something. And where they don’t think they can learn anything. Its really telling that west Africa and central Asia are so unvisited. In fact, this is a really bad failure. It means that the sort of ideas that fellows bring back to Australia are the same ones, from the same sorts of people and the same sorts of places.</p>
+<p>So what places are changing their share of visits from fellows? Within each decade, to put the number of visits to each region in contect it would help to look at the number of visits as a percentage of the number of awards given out.</p>
+<pre class="r"><code>churchill_decades_awards &lt;- churchill_scrape_saved %&gt;%
+  mutate(decade = year %/% 10 * 10) %&gt;%
+  count(decade) %&gt;%
+  rename(awards_this_decade = n)
+
+churchill_decades_visited &lt;- churchill_regions_map_corrected %&gt;%
+  mutate(decade = year %/% 10 * 10) %&gt;%
+  count(corrected, decade) %&gt;%
+  rename(visits_this_place_this_decade = n) %&gt;%
+  complete(corrected, decade, fill = list(visits_this_place_this_decade = 0)) %&gt;%
+  left_join(churchill_decades_awards, by = &quot;decade&quot;) %&gt;%
+  mutate(percent_of_awards_visited_this_region_this_decade = visits_this_place_this_decade *100 / awards_this_decade) %&gt;%
+  group_by(corrected) %&gt;%
+  filter(sum(visits_this_place_this_decade) &gt; 25) %&gt;%
+  ungroup()</code></pre>
+<p>This lets us look and see which were the most visited places each decade as a percentage of the number of fellowships given out each year.</p>
+<pre class="r"><code>churchill_decades_visited %&gt;%
+  group_by(decade) %&gt;%
+  top_n(6, percent_of_awards_visited_this_region_this_decade) %&gt;%
+  ungroup() %&gt;%
+  ggplot(aes(x = reorder(corrected, percent_of_awards_visited_this_region_this_decade) , y = percent_of_awards_visited_this_region_this_decade, fill = decade)) +
+  geom_col() + 
+  coord_flip() + 
+  facet_wrap(~ decade) + 
+  guides(fill = NULL) + 
+  labs(y = &quot;Percent of awards visiting each place each decade&quot;, fill = &quot;Decade&quot;, x = &quot;&quot;)</code></pre>
+<p><img src="/post/2019-06-14-what-is-a-churchill-fellowship-part-1-where-do-they-go_files/figure-html/unnamed-chunk-10-1.png" width="672" /></p>
+<p>This looks pretty stable pattern across the decades. The top three of the USA, UK and Canada are the most visited places in all six decades that the Churchill Fellowship has been awarded.</p>
+<p>To look at this in a more principled manner, we can identify trends in the patterns of fellows’ visiting behaviour across the decades by fitting some models using <code>glm</code>.</p>
+<pre class="r"><code>slopes &lt;- churchill_decades_visited %&gt;%
+    nest(-corrected) %&gt;%
+    mutate(models = purrr::map(data, ~ glm(cbind(visits_this_place_this_decade, (awards_this_decade - visits_this_place_this_decade)) ~ decade, ., family = &quot;binomial&quot;))) %&gt;%
+    unnest(purrr::map(models, tidy)) %&gt;%
+    filter(term == &quot;decade&quot;) %&gt;%
+    mutate(p.value = p.adjust(p.value))</code></pre>
+<p>This lets us look at the places that exhibited the biggest positive change in the number of visits per fellowships awarded in each decade.</p>
+<pre class="r"><code>slopes %&gt;%
+  filter(p.value &lt; .05) %&gt;%
+  top_n(6, estimate) %&gt;% 
+  inner_join(churchill_decades_visited) %&gt;%
+  ggplot(aes(decade, percent_of_awards_visited_this_region_this_decade)) + 
+  geom_point() +
+  geom_smooth() +
+  facet_wrap(~ corrected, scales = &quot;free&quot;) +
+  labs(x = &quot;Decade&quot;, y = &quot;Percentage of awards each decade that visited this place&quot;)</code></pre>
+<p><img src="/post/2019-06-14-what-is-a-churchill-fellowship-part-1-where-do-they-go_files/figure-html/unnamed-chunk-12-1.png" width="672" /></p>
+<p>And look at the places with the greatest negative change in visits per fellowships given each decade.</p>
+<pre class="r"><code>slopes %&gt;%
+  filter(p.value &lt; .05) %&gt;%
+  top_n(6, -estimate) %&gt;% 
+  inner_join(churchill_decades_visited) %&gt;%
+  ggplot(aes(decade, percent_of_awards_visited_this_region_this_decade)) + 
+  geom_point() +
+  geom_smooth() +
+  facet_wrap(~ corrected, scales = &quot;free&quot;) +
+  labs(x = &quot;Decade&quot;, y = &quot;Percentage of awards each decade that visited this place&quot;)</code></pre>
+<p><img src="/post/2019-06-14-what-is-a-churchill-fellowship-part-1-where-do-they-go_files/figure-html/unnamed-chunk-13-1.png" width="672" /></p>
+<p>Ireland is the stand out mover. Its gone from attracting less than 1% of fellows in the 1960’s to more than 8% of fellows so far this decade.</p>
+<p>Finally, one of the interesting things about the fellowship is visiting multiple places. So, it might be interesting to see which combinations of places fellows visit the most. This is a job for the <code>UpSetR</code> package.</p>
+<pre class="r"><code>wtf &lt;- churchill_regions_map_corrected %&gt;%
+  select(project, corrected) %&gt;%
+  mutate(n = 1) %&gt;%
+  distinct() %&gt;%
+  spread(corrected, n) %&gt;%
+  select(-project) %&gt;%
+  replace(is.na(.), 0)
+
+upset(as.data.frame(wtf), order.by = &quot;freq&quot;, nsets = 10)</code></pre>
+<p><img src="/post/2019-06-14-what-is-a-churchill-fellowship-part-1-where-do-they-go_files/figure-html/unnamed-chunk-14-1.png" width="672" /></p>
+<p>So, not only are the USA and UK the most visited places, but that combination is the most frequently visited combiantion of places!</p>
+<div class="footnotes">
+<hr />
+<ol>
+<li id="fn1"><p>If anyone can suggest a neat way to find the number of pages without looking manually please let me know.<a href="#fnref1">↩</a></p></li>
+</ol>
+</div>
+
+</main>
+
+  <footer>
+  <script src="//yihui.name/js/math-code.js"></script>
+<script async src="//mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML"></script>
+
+<script async src="//yihui.name/js/center-img.js"></script>
+
+  
+  <hr/>
+  &copy; Owen Churches 2018-2019 | <a href="https://github.com/ofchurches">Github</a> | <a href="https://twitter.com/owenchurches">Twitter</a>
+  
+  </footer>
+  </body>
+</html>
+
