@@ -48,6 +48,10 @@
   </url>
   
   <url>
+    <loc>/talks/</loc>
+  </url>
+  
+  <url>
     <loc>/tags/ai-ethics/</loc>
     <lastmod>2019-05-16T00:00:00+00:00</lastmod>
     <priority>0</priority>
